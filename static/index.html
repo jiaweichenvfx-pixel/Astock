@@ -149,6 +149,23 @@
   .plan-levels b { color:var(--text); font-variant-numeric:tabular-nums; }
 
   /* ── layout ── */
+  /* 低频/冗余卡片：默认隐藏，页脚按钮可展开 */
+  .card.legacy { display:none; }
+  body.show-legacy .card.legacy { display:block; }
+
+  /* 工具箱折叠 */
+  .toolbox { border:1px solid var(--border); border-radius:16px; background:linear-gradient(180deg, var(--panel), var(--bg2));
+    overflow:hidden; }
+  .toolbox > summary { cursor:pointer; padding:15px 18px; font-weight:700; font-size:14px; list-style:none;
+    display:flex; align-items:center; gap:8px; color:var(--text); }
+  .toolbox > summary::-webkit-details-marker { display:none; }
+  .toolbox > summary::after { content:'▾'; margin-left:auto; color:var(--dim); font-size:12px; }
+  .toolbox[open] > summary::after { content:'▴'; }
+  .toolbox > summary:hover { background:rgba(255,255,255,.02); }
+  .toolbox[open] > summary { border-bottom:1px solid var(--border); }
+  .toolbox .card { border:none; border-radius:0; box-shadow:none; background:transparent; }
+  .toolbox .card + .card { border-top:1px dashed var(--border); }
+
   .grid { display:grid; grid-template-columns: 360px 1fr 340px; gap:16px; margin-top:16px; align-items:start; }
   @media (max-width: 1150px) { .grid { grid-template-columns: 1fr; } header { position:static; } }
   .col { display:flex; flex-direction:column; gap:16px; min-width:0; }
@@ -421,7 +438,7 @@
         <div id="sellPanel"></div>
       </div>
 
-      <div class="card">
+      <div class="card legacy">
         <h2>🛒 买点推荐 <span class="tag">多策略投票</span></h2>
         <div id="buyPanel"></div>
       </div>
@@ -447,12 +464,12 @@
         <div id="deleveragePanel"></div>
       </div>
 
-      <div class="card">
+      <div class="card legacy">
         <h2>🔁 换股配对 <span class="tag">砍谁 → 买谁</span></h2>
         <div id="swapPanel"></div>
       </div>
 
-      <div class="card">
+      <div class="card legacy">
         <h2>📝 综合决策摘要</h2>
         <div id="summaryPanel"></div>
       </div>
@@ -493,12 +510,12 @@
         </div>
       </div>
 
-<div class="card">
+<div class="card legacy">
         <h2>📈 持仓板块表现</h2>
         <div id="sectorPanel"></div>
       </div>
 
-      <div class="card">
+      <div class="card legacy">
         <h2>🏊 持仓池分布 <span class="tag">五池</span></h2>
         <div id="poolPanel"></div>
       </div>
@@ -517,10 +534,14 @@
         <div id="wpEval"><div class="dim" style="font-size:12px;">加载中…</div></div>
       </div>
 
-      <div class="card">
+      <div class="card legacy">
         <h2>⚖️ 选股策略对比 <span class="tag">历史回测排名</span></h2>
         <div id="factorPanel"><div class="dim" style="font-size:12px;">加载中…</div></div>
       </div>
+
+      <details class="toolbox">
+        <summary>🔧 工具箱 · 模拟回测 / 参数寻优 / 长中短对比
+          <span class="dim" style="font-weight:400;font-size:11px;">（低频工具，平时收起）</span></summary>
 
       <div class="card">
         <h2>🧪 模拟回测 <span class="tag">多周期</span></h2>
@@ -548,11 +569,15 @@
         </div>
         <div id="optResult" style="margin-top:10px;"></div>
       </div>
+      </details>
     </div>
   </div>
 
   <footer>
     <div id="strategyText">💬 今日策略：加载中…</div>
+    <div style="margin-bottom:6px;">
+      <button class="sm" onclick="document.body.classList.toggle('show-legacy');this.textContent=document.body.classList.contains('show-legacy')?'收起低频卡片':'显示全部卡片';">显示全部卡片</button>
+    </div>
     <div class="disclaimer">⚠️ 本系统仅提供<b>决策建议</b>，不连接券商、不自动下单。「市价/限价」为建议挂单方式。数据来源 akshare + 腾讯行情（公开接口，可能延迟）。据此操作，风险自负。</div>
   </footer>
 </div>
