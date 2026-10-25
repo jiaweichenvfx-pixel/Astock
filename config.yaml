@@ -1,0 +1,188 @@
+# 「看长做短」V5.1 完整配置（已按定稿 spec 锁死）
+# 所有百分比的分母 = 总资产（净资产 + 融资余额）
+
+# ── 1. 账户模式定义 ──────────────────────────────────────────────
+account_modes:
+  emergency:
+    name: "🔴 急救模式"
+    trigger: { health_min: 0, health_max: 30 }
+    position_limits: { single_max: 5, total_max: 60, leverage_max: 0, cash_min: 40 }
+    stop_loss: -3          # 新买入硬止损百分比
+    take_profit: 5
+    time_stop_days: 5      # 时间止损 N 天
+    time_stop_profit: 1.0  # 时间止损收益阈值 %
+    forbidden_strategies: ["momentum", "breakout"]
+
+  defense:
+    name: "🟠 防守模式"
+    trigger: { health_min: 30, health_max: 50 }
+    position_limits: { single_max: 10, total_max: 70, leverage_max: 20, cash_min: 30 }
+    stop_loss: -5
+    take_profit: 8
+    time_stop_days: 7
+    time_stop_profit: 1.0
+    forbidden_strategies: []
+
+  balance:
+    name: "🟡 平衡模式"
+    trigger: { health_min: 50, health_max: 70 }
+    position_limits: { single_max: 20, total_max: 85, leverage_max: 40, cash_min: 15 }
+    stop_loss: -7
+    take_profit: 12
+    time_stop_days: 10
+    time_stop_profit: 2.0
+    forbidden_strategies: []
+
+  attack:
+    name: "🟢 进攻模式"
+    trigger: { health_min: 70, health_max: 100 }
+    position_limits: { single_max: 30, total_max: 100, leverage_max: 60, cash_min: 0 }
+    stop_loss: -10
+    take_profit: 15
+    time_stop_days: 15
+    time_stop_profit: 3.0
+    forbidden_strategies: []
+
+# ── 2. 策略权重矩阵（Phase 6 用）────────────────────────────────
+strategy_weights:
+  emergency: { value: 25, ma: 5, bollinger: 5, momentum: 0, grid: 65 }
+  defense:   { value: 35, ma: 10, bollinger: 15, momentum: 5, grid: 35 }
+  balance:   { value: 30, ma: 20, bollinger: 20, momentum: 10, grid: 20 }
+  attack:    { value: 20, ma: 30, bollinger: 10, momentum: 30, grid: 10 }
+
+# ── 2b. 策略参数（Phase 6）──────────────────────────────────────
+strategy_params:
+  ma_short: 5
+  ma_long: 20
+  ma_annual: 250
+  bollinger_n: 20
+  bollinger_k: 2.0
+  rsi_n: 14
+  rsi_overbought: 80
+  rsi_oversold: 20
+  momentum_days: 60
+  momentum_strong: 20     # 60日涨幅 > 20% 视为强动量
+  momentum_weak: -20
+  value_pe_max: 20        # 长线价值：PE < 20 视为低估
+  vote_strong: 40         # 加权投票 >= 40 → 强烈推荐
+  vote_watch: 10          # >= 10 → 伺机买入
+  grid_rebuy_pct: -5      # 持仓浮亏超过 -5% 触发网格补仓
+  grid_take_profit_pct: 5 # 浮盈超过 +5% 触发网格止盈
+  swing_min_pct: 12       # 波段最小涨跌幅：Zigzag 反向 >= 12% 才确认一个波段高低点
+
+# ── 3. 卖出规则（四大机制）─────────────────────────────────────
+exit_rules:
+  stop_loss:
+    execution: "market_order"
+    # 深套阈值：浮亏超过该模式止损线绝对值时，视为「已深套」，改由时间/基本面止损主导
+    deep_underwater_margin: 3.0   # 比止损线再深 3 个百分点即切换
+  time_stop:
+    warning_days: 5
+    force_days: 10
+    profit_threshold: 1.0
+  fundamental_stop:
+    growth_crash: -30          # 扣非净利同比 < -30% 触发
+    roe_drop_pp: 5             # ROE(TTM) 同比下滑 5 个百分点触发
+    st_action: "force_sell"
+  technical_exit:
+    rsi_overbought: 80
+    volume_ratio: 1.5          # 放量滞涨：量 > 1.5×均量
+    stall_gain_pct: 2.0        # 且涨幅 < 2%
+    macd_divergence: true
+  severity:                     # 紧急度打分基础分
+    hard_stop: 80
+    fundamental: 75
+    time_stop: 65
+    technical_divergence: 60
+    technical_overbought: 50
+    technical_stall: 45
+    multi_signal_bonus: 5       # 每多一个信号 +5
+    multi_signal_cap: 15
+  sell_flight:                  # 卖飞防御（AND）
+    sector_rps_threshold: 90
+    net_inflow_days: 3
+    annual_line_breakout: true
+    level_downgrade: 1
+
+# ── 4. 质量筛选 ─────────────────────────────────────────────────
+quality:
+  roe_excellent: 15
+  growth_excellent: 10
+  growth_warning: -10
+  min_market_cap: 50            # 亿元
+  auto_reject_st: true
+  diamond_bottom:
+    pb_lt_1: true               # 破净
+    pe_percentile_lt: 10        # PE 历史分位 < 10%
+    consecutive_profit_years: 3
+
+# ── 5. 健康度评分卡权重/阈值 ────────────────────────────────────
+health_scorecard:
+  weights:
+    financing: 25
+    pnl: 25
+    quality: 25
+    concentration: 15
+    market_env: 10
+  financing_ratio:            # 融资比例 → 得分（左闭右开）
+    - { lt: 30, score: 25 }
+    - { lt: 50, score: 15 }
+    - { lt: 70, score: 5 }
+    - { lt: 1000, score: 0 }
+  pnl_ratio:                  # 账户整体浮亏/浮盈 → 得分
+    - { gt: 10, score: 25 }          # 浮盈 > 10%
+    - { gte: 0, lt: 10, score: 15 }  # 浮亏 [0,10)
+    - { gte: -10, lt: 0, score: 15 }
+    - { gte: -20, lt: -10, score: 8 }
+    - { lt: -20, score: 0 }
+  position_color_deduction:   # 持仓颜色扣分
+    green: 0
+    yellow: 5
+    orange: 10
+    red: 15
+  concentration:
+    rules:
+      - { min: 3, max: 5, score: 15 }
+      - { min: 6, max: 8, score: 10 }
+      - { min: 9, max: 1000, score: 5 }
+    default: 5
+
+# ── 6. 市场环境 ─────────────────────────────────────────────────
+market_env:
+  hot_min: 8
+  mild_min: 4
+  turnover_ratio: { mild: 0.8, hot: 1.2 }   # 成交额 / 30日均量
+  adv_decl_ratio: { mild: 1.0, hot: 1.5 }   # 涨跌家数比
+  index_ma20: true                          # 指数站上 20 日线加分
+
+# ── 7. 分步降杠杆路径 ───────────────────────────────────────────
+deleverage:
+  steps: 3
+  # 每步的仓位回落比例（相对当前→目标的总缺口），累计 = 1
+  step_ratios: [0.4, 0.35, 0.25]
+  time_windows: ["本周内", "1-2 周内", "2-4 周内"]
+  rebound_pct: 3.0    # 「反弹到 X 元」的默认反弹幅度 %
+
+# ── 8. 换股配对（Phase 8）──────────────────────────────────────
+position_swap:
+  match_by_sector: true
+  max_swap_positions: 5
+
+# ── 9. 回测 A 股规则（Phase 9）─────────────────────────────────
+backtest:
+  commission_rate: 0.00025   # 佣金万2.5
+  stamp_tax_rate: 0.0005     # 印花税 0.05%（卖出）
+  transfer_fee_rate: 0.00001 # 过户费
+  financing_interest_rate: 0.05   # 融资年化 5%
+  slippage: 0.001            # 滑点 0.1%
+  t_plus_1: true             # T+1
+  limit_up_down_block: true  # 涨跌停无法成交
+
+# ── 汇率（港股折算）─────────────────────────────────────────────
+fx:
+  hkd_cny: 0.8508      # 港币 → 人民币（按港股通口径反推，2026-10-23）
+
+# ── 融资担保 ────────────────────────────────────────────────────
+margin:
+  warning_ratio: 150     # 警戒线：低于此比例会被要求追加担保
+  liquidation_ratio: 130 # 平仓线：低于此比例会被强平

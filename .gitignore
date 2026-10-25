@@ -1,0 +1,16 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# 数据与缓存（DB 会随刷新变化，不进 git；需要时单独备份）
+data/cache/
+data/*.db
+data/*.db-journal
+
+# 截图产物
+output/*.png
+
+# macOS
+.DS_Store
