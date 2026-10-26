@@ -8,6 +8,7 @@ __pycache__/
 data/cache/
 data/*.db
 data/*.db-journal
+data/account.json          # 真实持仓，仅本地
 
 # 截图产物
 output/*.png

@@ -1,0 +1,32 @@
+{
+  "positions": [
+    {
+      "code": "600519",
+      "name": "贵州茅台",
+      "shares": 100,
+      "cost_price": 1500.0,
+      "buy_date": "2025-01-15",
+      "account_type": "普通"
+    },
+    {
+      "code": "300750",
+      "name": "宁德时代",
+      "shares": 200,
+      "cost_price": 220.0,
+      "buy_date": "2025-06-10",
+      "account_type": "普通"
+    },
+    {
+      "code": "600489",
+      "name": "中金黄金",
+      "shares": 2000,
+      "cost_price": 15.0,
+      "buy_date": "2025-09-01",
+      "account_type": "信用"
+    }
+  ],
+  "cash": 50000.0,
+  "credit_cash": 10000.0,
+  "financing_balance": 60000.0,
+  "note": "示例数据：请复制为 data/account.json 后替换成你自己的持仓"
+}
