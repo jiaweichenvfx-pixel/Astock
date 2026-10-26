@@ -728,6 +728,12 @@ async function loadFundamental() {
           · 连续 ${x.consecutive} 期${x.trend === 'improving' ? '改善' : '恶化'}
           · ROE ${x.latest_roe == null ? '—' : x.latest_roe + '%'}
         </div>
+        ${x.forecast ? `<div style="font-size:10px;margin-top:1px;color:${x.forecast.conflict ? 'var(--orange)' : (x.forecast.change_pct > 0 ? 'var(--green)' : 'var(--red)')};">
+          ${x.forecast.conflict ? '⚠️ 预告存疑' : '📣 业绩预告'}：${esc(x.forecast.type || '')}
+          ${x.forecast.change_pct == null ? '' : (x.forecast.change_pct > 0 ? '+' : '') + x.forecast.change_pct + '%'}
+          <span class="dim">（${esc((x.forecast.notice_date || '').slice(5))} 公告）</span>
+          ${x.forecast.conflict ? '<span class="dim">· 与实际不符，以实际为准</span>' : ''}
+        </div>` : ''}
       </div>`;
     }).join('');
     const bad = (r.deteriorating || []).length;

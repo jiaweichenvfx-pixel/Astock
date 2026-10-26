@@ -15,6 +15,7 @@ def _series(growths, roes=None):
 
 
 def _stub(monkeypatch, data, up=0, down=0):
+    monkeypatch.setattr(fundamental.adapter, "get_earnings_forecast", lambda codes: {})
     if data:
         data["consecutive_up"] = up
         data["consecutive_down"] = down
@@ -68,3 +69,36 @@ def test_scan_sorts_deteriorating_first(monkeypatch):
     assert res["deteriorating"] == ["600000"]
     assert res["improving"] == ["600002"]
     assert res["rows"][0]["code"] == "600000"
+
+
+# ── 业绩预告 ─────────────────────────────────────────────────────
+def test_forecast_positive_future_period(monkeypatch):
+    _stub(monkeypatch, _series([20, 21, 22, 23]), up=0)
+    monkeypatch.setattr(fundamental.adapter, "get_earnings_forecast",
+                        lambda codes: {"600000": {"period": "20991231", "type": "预增",
+                                                  "change_pct": 50.0, "notice_date": "2026-10-20"}})
+    r = fundamental.assess("600000")
+    assert r["forecast"]["period"] == "20991231"
+    assert r["forecast"].get("positive") is True
+
+
+def test_forecast_loss_warns_early(monkeypatch):
+    _stub(monkeypatch, _series([20, 22, 24, 26]), up=0)
+    monkeypatch.setattr(fundamental.adapter, "get_earnings_forecast",
+                        lambda codes: {"600000": {"period": "20991231", "type": "首亏",
+                                                  "change_pct": -180.0, "notice_date": "2026-10-20"}})
+    r = fundamental.assess("600000")
+    assert r["trend"] == "deteriorating"
+    assert "业绩预告" in r["reason"]
+
+
+def test_forecast_conflict_is_flagged(monkeypatch):
+    series = _series([10, 8, 6, 5])
+    series["series"][-1]["date"] = "2025-12-31"
+    _stub(monkeypatch, series, down=3)
+    monkeypatch.setattr(fundamental.adapter, "get_earnings_forecast",
+                        lambda codes: {"600000": {"period": "20251231", "type": "预增",
+                                                  "change_pct": 88.5, "notice_date": "2026-07-15"}})
+    r = fundamental.assess("600000")
+    assert r["forecast"]["conflict"] is True
+    assert "不符" in r["forecast"]["note"]

@@ -608,12 +608,13 @@ def get_financial_trend(code: str, periods: int = 8) -> Optional[dict]:
 
         series = [s for s in series if s["growth"] is not None][-periods:]
         # 连续同向变化（阈值 3 个百分点，过滤噪声）
+        # 注意：必须「方向一变就停」，否则涨跌交替会被误算成连续
         up = down = 0
         for i in range(len(series) - 1, 0, -1):
             delta = series[i]["growth"] - series[i - 1]["growth"]
-            if delta <= -3:
+            if delta <= -3 and up == 0:
                 down += 1
-            elif delta >= 3:
+            elif delta >= 3 and down == 0:
                 up += 1
             else:
                 break
@@ -994,4 +995,74 @@ def get_macro_data() -> dict:
         if val:
             out[key] = val
     _cache_set("macro_data", out)
+    return out
+
+
+# ── 业绩预告 ─────────────────────────────────────────────────────
+def _recent_report_periods(n: int = 2) -> list[str]:
+    """最近 n 个已过的报告期（YYYYMMDD），从近到远。"""
+    today = date.today()
+    cands = []
+    for y in (today.year, today.year - 1):
+        for md in ("1231", "0930", "0630", "0331"):
+            p = f"{y}{md}"
+            if p <= today.strftime("%Y%m%d"):
+                cands.append(p)
+    return sorted(set(cands), reverse=True)[:n]
+
+
+def get_earnings_forecast(codes: list[str]) -> dict[str, dict]:
+    """业绩预告（比正式财报早 1~3 个月）。
+
+    返回 {code: {period, type, change_pct, indicator, notice_date, text}}
+    优先取「扣除非经常性损益后的净利润」，没有则退回「归母净利润」。
+    缓存 12 小时。
+    """
+    if not HAS_AKSHARE or not codes:
+        return {}
+    cached = _cache_get("yjyg", 3600 * 12)
+    if cached and cached.get("period"):
+        table = cached["rows"]
+    else:
+        table, period = {}, None
+        periods = _recent_report_periods(2)
+        for p in periods:
+            try:
+                df = _ak_call(ak.stock_yjyg_em, date=p)
+            except Exception:
+                continue
+            if df is None or df.empty:
+                continue
+            period = period or p
+            want = ("扣除非经常性损益后的净利润", "归属于上市公司股东的净利润", "净利润")
+            for _, r in df.iterrows():
+                code = str(r.get("股票代码", "")).strip()
+                ind = str(r.get("预测指标", "")).strip()
+                if not code or ind not in want:
+                    continue
+                cur = table.get(code)
+                rank = want.index(ind)
+                pct = _to_float(r.get("业绩变动幅度"))
+                # 只取「更新的报告期」；同一期多指标时取优先级更高 / 幅度更大的
+                if cur is not None and cur["period"] > p:
+                    continue
+                if cur is None or cur["period"] < p or rank < cur["_rank"] or (
+                        rank == cur["_rank"] and pct is not None
+                        and abs(pct) > abs(cur.get("change_pct") or 0)):
+                    table[code] = {
+                        "period": p, "type": str(r.get("预告类型", "")).strip(),
+                        "change_pct": pct, "indicator": ind,
+                        "notice_date": str(r.get("公告日期", ""))[:10],
+                        "text": str(r.get("业绩变动", ""))[:200],
+                        "_rank": rank,
+                    }
+        if not table:
+            return cached["rows"] if cached else {}
+        _cache_set("yjyg", {"period": period, "rows": table})
+
+    out = {}
+    for c in codes:
+        row = table.get(str(c))
+        if row:
+            out[str(c)] = {k: v for k, v in row.items() if k != "_rank"}
     return out
