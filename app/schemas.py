@@ -216,6 +216,16 @@ class Account:
             return 0.0
         return round((self.position_value / total_cost - 1) * 100, 2)
 
+    @property
+    def leverage_ratio(self) -> float:
+        """真实杠杆 = 持仓市值 / 净资产 * 100（含融资口径，>100 表示满仓+借钱）。
+
+        区别于 position_ratio（市值/总资产）：后者不含融资，降杠杆时会因分母缩小而失真。
+        """
+        if self.net_assets <= 0:
+            return 0.0
+        return round(self.position_value / self.net_assets * 100, 2)
+
     def to_dict(self) -> dict:
         return {
             "cash": self.cash,
@@ -226,6 +236,7 @@ class Account:
             "net_assets": self.net_assets,
             "financing_ratio": self.financing_ratio,
             "position_ratio": self.position_ratio,
+            "leverage_ratio": self.leverage_ratio,
             "cash_ratio": self.cash_ratio,
             "overall_pnl_ratio": self.overall_pnl_ratio,
             "maintenance_ratio": self.maintenance_ratio,

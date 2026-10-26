@@ -72,7 +72,7 @@ def rank(code: str, purpose: str = "hold", day: Optional[str] = None) -> list[di
             s = (stab if stab is not None else 0) * 100
             r["rank_score"] = round(hit * 0.40 + min(100.0, s * 0.30) + freq * 0.20 + edge_small * 0.10, 1)
             # 新开仓宁可少赚，也要排名能复现
-            r["eligible"] = trades >= 4 and (stab is None or stab >= 0.25) and per_trade > T_COST_PCT
+            r["eligible"] = trades >= 4 and (stab is not None and stab >= 0.25) and per_trade > T_COST_PCT
         else:   # hold
             r["rank_score"] = round(r["score"] * 0.7 + hit * 0.3, 1)
             r["eligible"] = trades >= 2

@@ -65,10 +65,12 @@ def compute(account, health: Optional[dict] = None,
     daily = fin * rate / 365 if fin > 0 else 0.0
     break_even = (fin * rate / net * 100) if net > 0 else 0.0
 
-    # 4) 自选池只数按权重分配（每档 6~16）
-    sizes = {}
-    for k in ("short", "mid", "long"):
-        sizes[k] = max(6, min(16, round(TOTAL_SLOTS * w[k])))
+    # 4) 自选池只数按权重分配（每档 6~16），并把余数补到权重最大的档，保证合计 = TOTAL_SLOTS
+    sizes = {k: max(6, min(16, round(TOTAL_SLOTS * w[k]))) for k in ("short", "mid", "long")}
+    delta = TOTAL_SLOTS - sum(sizes.values())
+    if delta:
+        anchor = max(sizes, key=lambda k: w[k])
+        sizes[anchor] += delta
 
     return {
         "weights": {k: round(w[k] * 100, 1) for k in ("short", "mid", "long")},

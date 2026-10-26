@@ -249,7 +249,8 @@ def scan_positions(
         bonus = min(severity_cfg["multi_signal_cap"], severity_cfg["multi_signal_bonus"] * (len(candidates) - 1))
         score = min(100, base + bonus)
 
-        # 卖飞防御：满足一条 −10 分（封顶降一级）；三条全中（AND）再降一级
+        # 卖飞防御：满足一条条件 −10 分（最多 −30）；三条全中（AND）再额外降一级。
+        # 但最终「最多比基础级别低一级」，避免一条卖飞防御把必卖信号降成持有。
         flight, flight_reasons = check_flight_defense(
             f.get("sector_rps"), f.get("net_inflow_days"), bool(f.get("annual_breakout"))
         )
@@ -276,7 +277,7 @@ def scan_positions(
             cur = pos.current_price if pos.current_price is not None else pos.cost_price
             rebound_price = round(cur * (1 + rebound_pct / 100), 2)
             reason_parts.append(f"深套：反弹至 {rebound_price} 元（+{rebound_pct}%）再减仓，不追低割肉")
-            suggested = suggested or rebound_price
+            suggested = rebound_price
 
         if flight_reasons and not flight:
             reason_parts.append("卖飞风险：" + "、".join(flight_reasons))

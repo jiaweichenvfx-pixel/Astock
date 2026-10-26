@@ -298,6 +298,12 @@ def rank_strategies(horizon: str = "mid", top_k: int = TOP_K) -> dict:
             baseline.append((i, fwd))
 
     result = []
+    # 基准按再平衡日分组，供每个策略 O(1) 取均值
+    base_by_date: dict[int, list[float]] = {}
+    for idx, fwd in baseline:
+        base_by_date.setdefault(idx, []).append(fwd)
+    base_mean = {i: sum(v) / len(v) for i, v in base_by_date.items()}
+
     for s, rows in acc.items():
         by_date = {}
         for sc, i, fwd in rows:
@@ -307,7 +313,7 @@ def rank_strategies(horizon: str = "mid", top_k: int = TOP_K) -> dict:
             lst.sort(key=lambda x: -x[0])
             top = lst[:top_k]
             avg = sum(x[1] for x in top) / len(top)
-            base = _base_at(baseline, i)
+            base = base_mean.get(i)
             rets.append(avg)
             if base is not None:
                 beats.append(1 if avg > base else 0)
@@ -329,11 +335,6 @@ def rank_strategies(horizon: str = "mid", top_k: int = TOP_K) -> dict:
         "forward_days": cfg["forward"], "rebalance_days": cfg["rebalance"],
         "universe": len(uni), "baseline_avg": base_avg, "strategies": result,
     }
-
-
-def _base_at(baseline: list[tuple[int, float]], i: int) -> Optional[float]:
-    vals = [fwd for idx, fwd in baseline if idx == i]
-    return sum(vals) / len(vals) if vals else None
 
 
 def _rank_key(horizon: str, d: str) -> str:

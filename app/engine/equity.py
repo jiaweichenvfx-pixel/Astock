@@ -124,14 +124,27 @@ def curve(days: int = DEFAULT_DAYS, account: Optional[dict] = None,
         by_date[row["date"]] = row
     merged = [by_date[d] for d in sorted(by_date)]
 
-    # 末点用真实账户值覆盖，避免估算误差影响「当前回撤」
+    # 末点用真实账户值覆盖，避免估算误差影响「当前回撤」；
+    # 若末点日期不是今天（如周末/盘前，末点是上个交易日），则追加一个新点，避免把今天的值贴在旧日期上
     if merged and account:
-        merged[-1] = {**merged[-1],
-                      "total_assets": account.get("total_assets"),
-                      "net_assets": account.get("net_assets"),
-                      "position_value": account.get("position_value"),
-                      "financing": account.get("financing_balance"),
-                      "financing_ratio": account.get("financing_ratio")}
+        today = adapter.data_day()
+        last = merged[-1]
+        if last["date"] == today:
+            merged[-1] = {**last,
+                          "total_assets": account.get("total_assets"),
+                          "net_assets": account.get("net_assets"),
+                          "position_value": account.get("position_value"),
+                          "financing": account.get("financing_balance"),
+                          "financing_ratio": account.get("financing_ratio")}
+        else:
+            merged.append({
+                "date": today,
+                "total_assets": account.get("total_assets"),
+                "net_assets": account.get("net_assets"),
+                "position_value": account.get("position_value"),
+                "financing": account.get("financing_balance"),
+                "financing_ratio": account.get("financing_ratio"),
+            })
 
     current_net = (account or {}).get("net_assets") or (merged[-1]["net_assets"] if merged else acc.net_assets)
     peak_net = max([(r["net_assets"] or 0) for r in merged] + [current_net]) if merged else current_net

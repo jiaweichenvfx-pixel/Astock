@@ -1640,7 +1640,8 @@ function renderAssets() {
     </div>
     <div style="margin-top:12px;">
       ${[['总资产', fmt(a.total_assets)], ['净资产', fmt(a.net_assets)], ['持仓市值', fmt(a.position_value)],
-         ['整体盈亏', pct(a.overall_pnl_ratio)]].map(([k,v]) =>
+         ['整体盈亏', pct(a.overall_pnl_ratio)],
+         ['真实杠杆', (a.leverage_ratio != null ? a.leverage_ratio + '%（市值/净资产）' : '—')]].map(([k,v]) =>
         `<div class="stat"><span class="k">${k}</span><span class="v ${colorFor(k==='整体盈亏'?a.overall_pnl_ratio:0)}">${v}</span></div>`).join('')}
     </div>`;
 }
