@@ -99,3 +99,24 @@ def test_active_codes_shape(monkeypatch):
     watchpool.add("mid", "600003", "中A", "2026-10-25", 30.0, 70.0, "站上20日线")
     codes = watchpool.active_codes()
     assert {"code": "600003", "name": "中A"} in codes
+
+
+# ── 市场环境闸门：下跌市暂停补充短线票 ─────────────────────────────
+def test_down_market_pauses_short_entries(monkeypatch):
+    monkeypatch.setattr(watchpool.adapter, "get_stock_history",
+                        lambda code, days=0, period="daily": _bars([10.0 + i * 0.1 for i in range(40)]))
+    r = watchpool.daily_update(_screener(), today="2026-10-25",
+                               regime={"regime": "down", "label": "下跌市"})
+    pools = {a[0] for a in r["added"]}
+    assert "short" not in pools, "下跌市不应新增短线票"
+    assert "mid" in pools or "long" in pools
+    assert r["market"]["paused_pools"] == ["short"]
+
+
+def test_up_market_allows_short_entries(monkeypatch):
+    monkeypatch.setattr(watchpool.adapter, "get_stock_history",
+                        lambda code, days=0, period="daily": _bars([10.0 + i * 0.1 for i in range(40)]))
+    r = watchpool.daily_update(_screener(), today="2026-10-26",
+                               regime={"regime": "up", "label": "上涨市"})
+    assert "short" in {a[0] for a in r["added"]}
+    assert r["market"]["paused_pools"] == []

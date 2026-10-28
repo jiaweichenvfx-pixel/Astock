@@ -419,8 +419,16 @@ def watchpool_view():
     acc = storage.load_account()
     hw_info = hw.compute(acc, (get_summary().get("health") or {}))
 
+    from .engine import rescue as _rescue
+    try:
+        regime = _rescue.market_regime()
+    except Exception:
+        regime = {"regime": "neutral", "label": "震荡市"}
+
     return {
         "labels": watchpool.POOL_LABEL,
+        "market": {"regime": regime.get("regime"), "label": regime.get("label"),
+                   "paused_pools": ["short"] if regime.get("regime") == "down" else []},
         "pools": members,
         "eval": watchpool.evaluate(),
         "history": watchpool.history(),

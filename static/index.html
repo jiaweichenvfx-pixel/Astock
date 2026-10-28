@@ -1163,8 +1163,12 @@ async function loadWatchpool() {
     const label = r.labels || {};
     const colors = { short: 'var(--red)', mid: 'var(--yellow)', long: 'var(--green)' };
     const ps = (r.pool_sizes || {});
+    const mk = r.market || {};
+    const paused = (mk.paused_pools || []).includes('short');
     if (meta) meta.innerHTML = `短/中/长 目标 ${ps.short || '-'}/${ps.mid || '-'}/${ps.long || '-'} 只`
-      + (r.horizon_weights ? ` · 权重 ${r.horizon_weights.short}/${r.horizon_weights.mid}/${r.horizon_weights.long}%` : '');
+      + (r.horizon_weights ? ` · 权重 ${r.horizon_weights.short}/${r.horizon_weights.mid}/${r.horizon_weights.long}%` : '')
+      + (mk.label ? ` · ${esc(mk.label)}` : '')
+      + (paused ? '<span style="color:var(--orange)"> · 短线暂停补充</span>' : '');
     const sec = (pkey) => {
       const ms = r.pools[pkey] || [];
       const rows = ms.map(m => {

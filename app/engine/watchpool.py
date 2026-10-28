@@ -91,7 +91,8 @@ def _review(pool: str, code: str) -> Optional[tuple[float, str]]:
 # ── 每日迭代 ─────────────────────────────────────────────────────
 def daily_update(screener: dict, today: Optional[str] = None,
                  strategies: Optional[dict] = None,
-                 pool_sizes: Optional[dict] = None) -> dict:
+                 pool_sizes: Optional[dict] = None,
+                 regime: Optional[dict] = None) -> dict:
     """收盘后跑一次：入选 + 复盘剔除。
 
     screener = 精选选股结果（含 short/mid/long），作为默认入选来源；
@@ -103,8 +104,20 @@ def daily_update(screener: dict, today: Optional[str] = None,
     strategies = strategies or {}
     sizes = {p: (pool_sizes or {}).get(p, POOL_SIZE) for p in POOLS}
 
+    # 市场环境：下跌市暂停补充短线票（短线追的是正在涨的，跌市里最容易追在高点）
+    if regime is None:
+        try:
+            from .rescue import market_regime
+            regime = market_regime()
+        except Exception:
+            regime = {"regime": "neutral", "label": "震荡市"}
+    down = regime.get("regime") == "down"
+    pause_pools = {"short"} if down else set()
+
     # 1) 入选：每池补到目标只数（不重复进入同一池）
     for pool, key in (("short", "short"), ("mid", "mid"), ("long", "long")):
+        if pool in pause_pools:
+            continue          # 下跌市：短线池只出不进，跌坏了自然被剔除
         active = {m["code"] for m in list_members(pool, "active")}
         if pool in strategies:
             from . import factor
@@ -134,6 +147,8 @@ def daily_update(screener: dict, today: Optional[str] = None,
                 removed.append((pool, m["code"]))
 
     return {"date": today, "added": added, "removed": removed,
+            "market": {"regime": regime.get("regime"), "label": regime.get("label"),
+                       "paused_pools": sorted(pause_pools)},
             "pools": {p: len(list_members(p, "active")) for p in POOLS}}
 
 
