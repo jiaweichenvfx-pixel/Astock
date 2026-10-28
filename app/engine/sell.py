@@ -200,10 +200,20 @@ def scan_positions(
     quality: dict[str, QualityInfo],
     facts: Optional[dict[str, dict]] = None,
     trends: Optional[dict[str, dict]] = None,
+    earnings_season: Optional[bool] = None,
 ) -> list[SellSignal]:
-    """扫描所有持仓，输出卖出信号清单（已按紧急度降序）。"""
+    """扫描所有持仓，输出卖出信号清单（已按紧急度降序）。
+
+    earnings_season=True 时技术类信号降权 −10 分：财报跳空会造成假跌破/假突破。
+    """
     facts = facts or {}
     trends = trends or {}
+    if earnings_season is None:
+        try:
+            from ..data import adapter as _ad
+            earnings_season = _ad.in_earnings_season()
+        except Exception:
+            earnings_season = False
     severity_cfg = config.get_exit_rules()["severity"]
     signals: list[SellSignal] = []
 
@@ -249,6 +259,12 @@ def scan_positions(
         bonus = min(severity_cfg["multi_signal_cap"], severity_cfg["multi_signal_bonus"] * (len(candidates) - 1))
         score = min(100, base + bonus)
 
+        # 财报季：技术类卖点降权，避免被财报跳空制造的假跌破骗出场
+        season_note = ""
+        if earnings_season and primary.mechanism == SellMechanism.TECHNICAL:
+            score = max(0, score - 10)
+            season_note = "（财报季：技术信号降权，财报跳空常造成假跌破）"
+
         # 卖飞防御：满足一条条件 −10 分（最多 −30）；三条全中（AND）再额外降一级。
         # 但最终「最多比基础级别低一级」，避免一条卖飞防御把必卖信号降成持有。
         flight, flight_reasons = check_flight_defense(
@@ -289,7 +305,7 @@ def scan_positions(
                 mechanism=primary.mechanism,
                 severity_score=score,
                 level=level,
-                reason="；".join(reason_parts),
+                reason="；".join(reason_parts) + season_note,
                 suggested_price=suggested,
                 execution=primary.execution,
                 flight_defense=flight,

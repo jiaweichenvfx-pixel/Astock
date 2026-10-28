@@ -692,8 +692,10 @@ async function loadBuypoint() {
       </div>`;
     }).join('');
     const cnt = r.counts || {};
+    const season = (r.rows || []).some(x => x.earnings_season);
     el.innerHTML = `<div class="dim" style="font-size:10.5px;margin-bottom:6px;">
         A ${cnt.A || 0} · B ${cnt.B || 0} · C ${cnt.C || 0} · D ${cnt.D || 0} · 排除 ${cnt.X || 0}
+        ${season ? '<span style="color:var(--orange)">· 📊 财报季，位置信号慎用</span>' : ''}
       </div>${rows}
       <div class="dim" style="font-size:10px;margin-top:6px;">${esc(r.note || '')}</div>`;
   } catch (e) {
@@ -725,8 +727,9 @@ async function loadFundamental() {
         </div>
         <div class="dim" style="font-size:10.5px;margin-top:1px;">
           扣非同比 ${x.latest_growth == null ? '—' : (x.latest_growth > 0 ? '+' : '') + x.latest_growth + '%'}
-          · 连续 ${x.consecutive} 期${x.trend === 'improving' ? '改善' : '恶化'}
+          · ${x.consecutive > 0 ? `连续 ${x.consecutive} 期${x.trend === 'improving' ? '改善' : '恶化'}` : (x.trend === 'improving' ? '改善中' : x.trend === 'deteriorating' ? '单季/深度恶化' : '平稳')}
           · ROE ${x.latest_roe == null ? '—' : x.latest_roe + '%'}
+          ${x.notice_date ? `· 公告 ${esc(String(x.notice_date).slice(5))}` : ''}
         </div>
         ${x.forecast ? `<div style="font-size:10px;margin-top:1px;color:${x.forecast.conflict ? 'var(--orange)' : (x.forecast.change_pct > 0 ? 'var(--green)' : 'var(--red)')};">
           ${x.forecast.conflict ? '⚠️ 预告存疑' : '📣 业绩预告'}：${esc(x.forecast.type || '')}

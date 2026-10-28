@@ -577,6 +577,32 @@ def get_financial_indicators(code: str) -> Optional[dict]:
     return out
 
 
+def get_report_notice_dates(period: str) -> dict[str, str]:
+    """某报告期的财报公告日 {code: 'YYYY-MM-DD'}（东财业绩报表，批量一次）。
+
+    用于区分「报告期末」和「实际公布日」——回测/判断时按公告日对齐才没有前视偏差。
+    """
+    if not HAS_AKSHARE:
+        return {}
+    key = f"yjbb_{period}"
+    cached = _cache_get(key, _ttl_financial())
+    if cached and "rows" in cached:
+        return cached["rows"]
+    rows: dict[str, str] = {}
+    try:
+        df = _ak_call(ak.stock_yjbb_em, date=period)
+        for _, r in df.iterrows():
+            code = str(r.get("股票代码", "")).strip()
+            d = str(r.get("最新公告日期", ""))[:10]
+            if code and d and d != "nan":
+                rows[code] = d
+    except Exception:
+        pass
+    if rows:
+        _cache_set(key, {"rows": rows})
+    return rows
+
+
 def get_financial_trend(code: str, periods: int = 8) -> Optional[dict]:
     """财务趋势：最近若干报告期的扣非净利同比增速 + 净资产收益率。
 
@@ -634,12 +660,22 @@ def get_financial_trend(code: str, periods: int = 8) -> Optional[dict]:
             else:
                 break
 
+        notice = None
+        if series:
+            period = series[-1]["date"].replace("-", "")
+            try:
+                notice = get_report_notice_dates(period).get(code)
+            except Exception:
+                notice = None
+            series[-1]["notice_date"] = notice
+
         out = {
             "series": series,
             "latest": series[-1] if series else None,
             "consecutive_up": up,
             "consecutive_down": down,
             "report_date": series[-1]["date"] if series else None,
+            "notice_date": notice,
         }
         _cache_set(key, out)
         return out

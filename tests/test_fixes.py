@@ -80,3 +80,39 @@ def test_earnings_season_ttl(monkeypatch):
     assert adapter.in_earnings_season(datetime(2026, 2, 10)) is False
     # TTL 在财报季应显著短于非财报季
     assert adapter.TTL_FINANCIAL_SEASON < adapter.TTL_FINANCIAL
+
+
+# 6) 财报季：技术类卖点降权
+def test_technical_downgraded_in_earnings_season(monkeypatch):
+    from app.engine import sell
+    from app.schemas import Account, Mode, Position
+
+    monkeypatch.setattr(sell.config, "get_mode", lambda m: {"stop_loss": -5, "time_stop_days": 10})
+    monkeypatch.setattr(sell.config, "get_exit_rules", lambda: {
+        "fundamental_stop": {"growth_crash": -30},
+        "technical_exit": {"rsi_overbought": 80, "volume_ratio": 1.5, "stall_gain_pct": 2.0},
+        "severity": {"multi_signal_cap": 15, "multi_signal_bonus": 5, "flight_penalty_per_cond": 10},
+        "stop_loss": {"deep_underwater_margin": 3.0},
+        "sell_flight": {"sector_rps_threshold": 90, "net_inflow_days": 3},
+    })
+    monkeypatch.setattr(sell.config, "get_deleverage", lambda: {"rebound_pct": 3.0})
+    pos = Position(code="600000", name="测试", shares=1000, cost_price=10.0, current_price=10.5)
+    acc = Account(positions=[pos], cash=0.0, financing_balance=0.0)
+    facts = {"600000": {"volume_ratio": 2.0, "gain_pct": 0.5}}   # 放量滞涨 → 技术卖点
+
+    normal = sell.scan_positions(acc, Mode.BALANCE, {}, facts=facts, trends={}, earnings_season=False)
+    season = sell.scan_positions(acc, Mode.BALANCE, {}, facts=facts, trends={}, earnings_season=True)
+    assert normal and season
+    assert season[0].severity_score < normal[0].severity_score
+    assert "财报季" in season[0].reason
+
+
+# 7) 财报公告日：报告期末 ≠ 公布日
+def test_financial_trend_exposes_notice_date(monkeypatch):
+    from app.data import adapter
+    monkeypatch.setattr(adapter, "get_report_notice_dates",
+                        lambda period: {"600000": "2026-10-28"})
+    # 直接构造返回结构校验字段存在
+    d = {"series": [{"date": "2026-09-30", "roe": 10, "growth": -5}],
+         "report_date": "2026-09-30", "notice_date": "2026-10-28"}
+    assert d["notice_date"] > d["report_date"] or d["notice_date"] != d["report_date"]

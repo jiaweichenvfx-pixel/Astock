@@ -91,6 +91,7 @@ def assess(code: str) -> dict:
         "consecutive": down if trend in ("deteriorating", "weakening") else up,
         "latest_growth": g, "latest_roe": latest.get("roe"),
         "report_date": latest.get("date"),
+        "notice_date": data.get("notice_date"),
         "score_delta": TREND_SCORE[trend],
         "reason": reason,
         "series": series[-6:],

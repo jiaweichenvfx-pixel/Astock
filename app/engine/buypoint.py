@@ -20,6 +20,14 @@ from .fundamental import assess as fundamental_assess
 from .indicators import kdj
 from .strategies import _weekly_j
 
+def _season() -> bool:
+    """当前是否处于财报密集披露期（技术信号噪声大）。"""
+    try:
+        return adapter.in_earnings_season()
+    except Exception:
+        return False
+
+
 LOW = 0.15          # 一年区间低位阈值
 HIGH = 0.85         # 一年区间高位阈值
 
@@ -86,7 +94,9 @@ def assess(code: str, name: Optional[str] = None) -> dict:
         "weekly_j": round(wj[-1], 1) if wj and wj[-1] is not None else None,
         "turning_up": turn,
         "fundamental": {"trend": f_trend, "label": fund.get("label"),
-                        "growth": fund.get("latest_growth")},
+                        "growth": fund.get("latest_growth"),
+                        "notice_date": fund.get("notice_date")},
+        "earnings_season": _season(),
         "reasons": reasons,
     }
 
