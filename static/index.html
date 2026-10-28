@@ -398,6 +398,11 @@
       </div>
 
       <div class="card">
+        <h2>🏦 融资成本 <span class="tag">每月底的现金支出</span></h2>
+        <div id="finCostPanel"><div class="loading"><span class="spinner"></span>计算中…</div></div>
+      </div>
+
+      <div class="card">
         <h2>📈 资产与杠杆 <span class="tag">净值 / 回撤</span></h2>
         <div id="equityPanel"><div class="dim" style="font-size:12px;">加载中…</div></div>
       </div>
@@ -665,6 +670,41 @@ const fmt = n => (n == null ? '--' : Number(n).toLocaleString('zh-CN', {maximumF
 const pct = n => (n == null ? '--' : (n > 0 ? '+' : '') + Number(n).toFixed(2) + '%');
 const colorFor = v => v > 0 ? 'c-red' : v < 0 ? 'c-green' : 'muted';
 function esc(s) { return (s == null ? '' : String(s)).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+/* ── 融资成本 ── */
+async function loadFinancing() {
+  const el = document.getElementById('finCostPanel');
+  if (!el) return;
+  try {
+    const r = await api('/api/financing');
+    const soon = r.days_to_payment <= 7;
+    const rows = (r.options || []).map(o =>
+      `<div class="stat"><span class="k">还 ${(o.repay / 1e4).toFixed(0)} 万</span>
+        <span class="v"><span class="dim" style="font-weight:400">月息</span> ${o.monthly_after.toFixed(0)}
+        <span class="dim" style="font-weight:400">· 年省</span>
+        <b class="c-green">${(o.annual_saving / 1e4).toFixed(1)}万</b></span></div>`).join('');
+    el.innerHTML = `
+      <div style="padding:10px 12px;border-radius:10px;border:1px solid ${soon ? '#7a2a2a' : '#3a3f52'};
+        background:${soon ? 'rgba(255,93,104,.08)' : 'rgba(255,255,255,.02)'};margin-bottom:8px;">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;">
+          <span style="font-size:12px;color:var(--muted);">本月底前要付</span>
+          <span style="font-size:20px;font-weight:800;color:${soon ? 'var(--red)' : 'var(--text)'};">
+            ¥${(r.monthly || 0).toLocaleString()}</span>
+        </div>
+        <div class="dim" style="font-size:10.5px;margin-top:4px;">
+          ${r.next_payment_date} 付息（还有 ${r.days_to_payment} 天）· 日息 ${r.daily} 元 · 年 ${(r.annual / 1e4).toFixed(1)} 万
+        </div>
+      </div>
+      <div class="stat"><span class="k">融资余额</span><span class="v">¥${(r.balance || 0).toLocaleString()}</span></div>
+      <div class="stat"><span class="k">打平线（相对净资产）</span>
+        <span class="v c-orange">${r.breakeven_on_net_pct}%/年</span></div>
+      <div class="dim" style="font-size:10.5px;margin:6px 0 4px;">${esc(r.verdict || '')}</div>
+      ${rows}
+      <div class="dim" style="font-size:10px;margin-top:6px;">${esc(r.note || '')}</div>`;
+  } catch (e) {
+    el.innerHTML = '<div class="dim">读取失败：' + esc(e.message) + '</div>';
+  }
+}
 
 /* ── 买点体检 ── */
 const BUY_COLOR = { A: 'var(--green)', B: 'var(--cyan)', C: 'var(--yellow)', D: 'var(--orange)', X: 'var(--red)' };
@@ -1536,7 +1576,7 @@ function render() {
   renderHeader(); renderHealth(); renderAssets(); renderGate(); renderPositions();
   renderSell(); renderBuy(); renderDeleverage(); renderSwap(); renderSummary();
   renderMarket(); renderMacro(); renderSectors(); renderPools();
-  renderStrategy(); loadTodo(); loadSignals(); loadEquity(); loadPortfolioBt(); loadWatchpool(); loadFactor(); loadRescue(); loadJwatch(); loadFundamental(); loadBuypoint();
+  renderStrategy(); loadTodo(); loadSignals(); loadEquity(); loadPortfolioBt(); loadWatchpool(); loadFactor(); loadRescue(); loadJwatch(); loadFundamental(); loadBuypoint(); loadFinancing();
 }
 
 /* 底部一句话策略：把「模式 + 卖点 + 仓位 + 市场温度」压成一句能直接照做的话 */

@@ -331,6 +331,19 @@ def _default_strategy(code: str, purpose: str = "hold") -> str:
     return rec.get("strategy") or "bollinger"
 
 
+@router.get("/api/financing")
+def financing_view():
+    """融资成本：月息、付息倒计时、打平线、还款方案。"""
+    from .engine import financing
+
+    acc = storage.load_account()
+    try:
+        pipeline.enrich_account(acc, adapter.get_quotes([p.code for p in acc.positions]))
+    except Exception:
+        pass
+    return financing.assess(acc)
+
+
 @router.get("/api/buypoint")
 def buypoint_view():
     """买点体检：位置（便宜）+ 趋势确认 + 基本面一票否决。"""
