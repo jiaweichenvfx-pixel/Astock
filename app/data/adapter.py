@@ -29,7 +29,8 @@ TTL_SPOT = 120          # 行情快照：2 分钟（盘中够新鲜）
 TTL_HISTORY = 21600     # 日线/分钟线：6 小时（收盘前更新，避免频繁重拉）
 TTL_CALENDAR = 86400 * 7
 TTL_MACRO = 600         # 宏观：10 分钟
-TTL_FINANCIAL = 86400 * 7  # 财务指标：7 天（季报级别，变化很小）
+TTL_FINANCIAL = 86400 * 7  # 财务指标：非财报季 7 天（季报级别，变化很小）
+TTL_FINANCIAL_SEASON = 3600 * 4  # 财报季 4 小时：一天出几百份财报，缓存太久会漏掉新公布的
 
 # 全市场快照抓取锁：避免多线程冷启动时重复抓取 5000+ 只行情
 _SPOT_LOCK = threading.Lock()
@@ -55,6 +56,20 @@ def _cache_set(key: str, data: dict) -> None:
     """写入 SQLite 缓存。"""
     from .db import cache_set
     cache_set(key, data)
+
+
+def in_earnings_season(now: Optional[datetime] = None) -> bool:
+    """是否处于 A 股财报密集披露期。
+
+    A 股披露截止日：一季报 4/30、半年报 8/31、三季报 10/31、年报次年 4/30。
+    所以 4 月、7-8 月、10 月是财报季，新报告天天出。
+    """
+    now = now or datetime.now()
+    return now.month in (4, 7, 8, 10)
+
+
+def _ttl_financial() -> int:
+    return TTL_FINANCIAL_SEASON if in_earnings_season() else TTL_FINANCIAL
 
 
 def _cache_path(key: str) -> Path:
@@ -548,7 +563,7 @@ def get_financial_indicators(code: str) -> Optional[dict]:
     if not HAS_AKSHARE:
         return None
     key = f"fin_{code}"
-    cached = _cache_get(key, TTL_FINANCIAL)
+    cached = _cache_get(key, _ttl_financial())
     if cached and "roe_ttm" in cached:
         return cached
 
@@ -571,7 +586,7 @@ def get_financial_trend(code: str, periods: int = 8) -> Optional[dict]:
     if not HAS_AKSHARE:
         return None
     key = f"fintrend_{code}"
-    cached = _cache_get(key, TTL_FINANCIAL)
+    cached = _cache_get(key, _ttl_financial())
     if cached and "series" in cached:
         return cached
 

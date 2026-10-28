@@ -66,3 +66,17 @@ def test_leverage_ratio():
                   cash=10000.0, financing_balance=20000.0)           # 净资产 30000+10000-20000=20000
     assert acc.leverage_ratio == pytest.approx(150.0)                 # 30000/20000
     assert acc.position_ratio == pytest.approx(75.0)                  # 30000/40000
+
+
+# 5) 财报季：财务缓存必须缩短，否则新财报要等一周
+def test_earnings_season_ttl(monkeypatch):
+    from datetime import datetime
+    from app.data import adapter
+
+    assert adapter.in_earnings_season(datetime(2026, 10, 28)) is True
+    assert adapter.in_earnings_season(datetime(2026, 4, 15)) is True
+    assert adapter.in_earnings_season(datetime(2026, 8, 20)) is True
+    assert adapter.in_earnings_season(datetime(2026, 11, 5)) is False
+    assert adapter.in_earnings_season(datetime(2026, 2, 10)) is False
+    # TTL 在财报季应显著短于非财报季
+    assert adapter.TTL_FINANCIAL_SEASON < adapter.TTL_FINANCIAL

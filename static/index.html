@@ -1339,9 +1339,10 @@ async function loadMarket() {
     tickClock();
     const snapTime = (m.as_of || '').split(' ')[1] || '--:--';
     const covered = (m.breadth && m.breadth.total) ? `全市场 ${fmt(m.breadth.total)} 只` : '交易日 ' + (m.trade_date || '--');
-    document.getElementById('miAsOf').textContent = m.is_trading_day === false
+    document.getElementById('miAsOf').textContent = (m.is_trading_day === false
       ? `数据截至 ${m.trade_date || '--'} 收盘 · ${covered}`
-      : `行情快照 ${snapTime} · ${covered}`;
+      : `行情快照 ${snapTime} · ${covered}`)
+      + (m.earnings_season ? ' · 📊 财报季（技术信号噪声大）' : '');
 
     // 主要指数
     document.getElementById('miIndices').innerHTML = (m.indices || []).map(i => {

@@ -68,6 +68,7 @@ def build_market_info(now: Optional[datetime] = None) -> dict:
         "session": session,
         "session_label": session_label,
         "is_trading_day": trading_day,
+        "earnings_season": adapter.in_earnings_season(now),
         "trade_date": adapter.latest_trade_day(now.date()),
         "as_of": now.strftime("%Y-%m-%d %H:%M"),
         "indices": indices,
