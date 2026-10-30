@@ -70,7 +70,8 @@ def test_review_keeps_healthy(monkeypatch):
 def test_daily_update_fills_pools(monkeypatch):
     monkeypatch.setattr(watchpool.adapter, "get_stock_history",
                         lambda code, days=0, period="daily": _bars([10.0 + i * 0.1 for i in range(40)]))
-    r = watchpool.daily_update(_screener(), today="2026-10-25")
+    r = watchpool.daily_update(_screener(), today="2026-10-25",
+                               regime={"regime": "up", "label": "上涨市"})
     assert {a[1] for a in r["added"]} == {"600001", "600002", "600003", "600004"}
     assert r["pools"]["short"] == 2 and r["pools"]["mid"] == 1 and r["pools"]["long"] == 1
 
@@ -78,8 +79,10 @@ def test_daily_update_fills_pools(monkeypatch):
 def test_daily_update_no_duplicate(monkeypatch):
     monkeypatch.setattr(watchpool.adapter, "get_stock_history",
                         lambda code, days=0, period="daily": _bars([10.0 + i * 0.1 for i in range(40)]))
-    watchpool.daily_update(_screener(), today="2026-10-25")
-    r2 = watchpool.daily_update(_screener(), today="2026-10-26")
+    watchpool.daily_update(_screener(), today="2026-10-25",
+                           regime={"regime": "up", "label": "上涨市"})
+    r2 = watchpool.daily_update(_screener(), today="2026-10-26",
+                                regime={"regime": "up", "label": "上涨市"})
     assert r2["added"] == []                     # 已进池的不会再进
 
 

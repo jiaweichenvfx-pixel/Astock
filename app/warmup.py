@@ -100,7 +100,13 @@ class Warmer:
                     _acc = _st.load_account()
                     _sum = api.get_summary()
                     _info = _hw.compute(_acc, _sum.get("health") or {})
-                    watchpool.daily_update(api.get_screener(),
+                    # 与手动「更新池子」用同一套引擎：按历史排名选战法，而不是退回 screener
+                    from .engine import factor as _f
+                    try:
+                        _strat = {k: _f.best_strategy(k) for k in ("short", "mid", "long")}
+                    except Exception:
+                        _strat = {}
+                    watchpool.daily_update(api.get_screener(), strategies=_strat,
                                            pool_sizes=_info["pool_size"])
                 except Exception:
                     pass
