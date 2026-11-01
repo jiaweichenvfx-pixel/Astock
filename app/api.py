@@ -618,6 +618,32 @@ def portfolio_bt_view(force: bool = False, date: Optional[str] = None):
 
 
 # ── 今日待办 / 信号复盘 ────────────────────────────────────────
+@router.get("/api/action")
+def action_view():
+    """行动卡：一眼看懂现在该做什么（说人话，不用懂战法）。"""
+    from .engine import action_card, buypoint, financing, todo as todo_engine
+
+    s = get_summary()
+    try:
+        t = todo_engine.build_todo(s)
+    except Exception:
+        t = {"items": []}
+    acc = storage.load_account()
+    try:
+        pipeline.enrich_account(acc, adapter.get_quotes([p.code for p in acc.positions]))
+    except Exception:
+        pass
+    try:
+        fin = financing.assess(acc)
+    except Exception:
+        fin = None
+    try:
+        bp = buypoint.scan([p.code for p in acc.positions])
+    except Exception:
+        bp = None
+    return action_card.build(s, t, fin, bp)
+
+
 @router.get("/api/todo")
 def todo():
     from .engine import todo as todo_engine

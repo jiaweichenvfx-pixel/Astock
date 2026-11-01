@@ -132,10 +132,17 @@ def check_fundamental_trend(pos: Position, trend: Optional[dict]) -> Optional[_C
     g = trend.get("latest_growth")
     if g is None:
         return None
+    n = trend.get("consecutive") or 0
+    if n >= 2:
+        why = f"连续 {n} 个季度利润下滑"
+    elif g < 0 and n <= 1:
+        why = "利润由正转负" if g > -30 else "利润大幅下滑"
+    else:
+        why = "利润走弱"
     return _Candidate(
         SellMechanism.FUNDAMENTAL,
         58,
-        f"基本面连续 {trend.get('consecutive', 0)} 期恶化（扣非同比 {g:+.1f}%），提前预警",
+        f"{why}（扣非同比 {g:+.1f}%），比硬性亏损提前预警",
         "limit_order",
         pos.current_price,
     )

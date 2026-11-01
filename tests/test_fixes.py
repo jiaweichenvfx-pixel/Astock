@@ -116,3 +116,54 @@ def test_financial_trend_exposes_notice_date(monkeypatch):
     d = {"series": [{"date": "2026-09-30", "roe": 10, "growth": -5}],
          "report_date": "2026-09-30", "notice_date": "2026-10-28"}
     assert d["notice_date"] > d["report_date"] or d["notice_date"] != d["report_date"]
+
+
+# 8) 行动卡：说人话的可执行清单
+def test_action_card_plain_language(monkeypatch):
+    from app.engine import action_card
+
+    summary = {
+        "account": {"position_ratio": 98.7, "financing_ratio": 38.0, "cash_ratio": 1.2,
+                    "financing_balance": 200000,
+                    "positions": [{"code": "000858", "name": "五粮液", "pnl_ratio": -37.1,
+                                   "current_price": 74.7}]},
+        "gate": {"can_buy": False, "total_max": 60, "leverage_max": 0, "cash_min": 40},
+        "sell": {"signals": [{"code": "000858", "level": "red", "mechanism": "fundamental",
+                              "reason": "扣非净利同比 -56.08% < -30%，增速崩塌"}]},
+        "market_env": {"temperature_label": "温和", "index_above_ma20": False},
+        "health": {"total": 27, "mode_label": "急救模式"},
+        "meta": {"earnings_season": True},
+    }
+    todo = {"trade_date": "2026-11-02",
+            "items": [{"code": "000858", "name": "五粮液", "shares": 300,
+                       "limit_price": 76.94, "action": "限价 76.94 挂单（反弹价）"}]}
+    fin = {"monthly": 1191, "balance": 200000, "rate": 0.065}
+
+    r = action_card.build(summary, todo, fin)
+    assert r["sells"] and r["sells"][0]["shares"] == 300
+    # 说人话：带数字，不是「扣非同比 < -30%」
+    assert "56%" in r["sells"][0]["why"]
+    assert "< -30%" not in r["sells"][0]["why"]
+    assert r["can_buy"] is False
+    assert any("急救" in x for x in r["no_buy_reasons"])
+    # 还融资省钱要有量化
+    assert r["effect"]["monthly_after"] < r["effect"]["monthly_before"]
+
+
+# 9) 行动卡：盈利仓位不能显示「浮亏」
+def test_action_card_profit_label(monkeypatch):
+    from app.engine import action_card
+
+    summary = {
+        "account": {"positions": [{"code": "600489", "name": "中金黄金",
+                                   "pnl_ratio": 16.34, "current_price": 19.23}],
+                    "financing_balance": 100000},
+        "gate": {"can_buy": False, "total_max": 60, "leverage_max": 20, "cash_min": 30},
+        "sell": {"signals": []},
+    }
+    todo = {"items": [{"code": "600489", "name": "中金黄金", "shares": 100,
+                       "limit_price": 19.23, "action": "补足差额（该股无卖点）"}]}
+    r = action_card.build(summary, todo, {"monthly": 500, "balance": 100000, "rate": 0.06})
+    assert "浮盈" in r["sells"][0]["detail"]
+    assert "浮亏" not in r["sells"][0]["detail"]
+    assert "没有卖点" in r["sells"][0]["why"]

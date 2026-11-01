@@ -166,6 +166,20 @@
   .toolbox .card { border:none; border-radius:0; box-shadow:none; background:transparent; }
   .toolbox .card + .card { border-top:1px dashed var(--border); }
 
+  .action-card { margin-bottom:16px; border:1px solid rgba(255,93,104,.35);
+    background:linear-gradient(180deg, rgba(255,93,104,.07), rgba(20,22,30,.6)); }
+  .action-card .verdict { font-size:17px; font-weight:800; margin-bottom:4px; }
+  .action-card .ctx { font-size:11px; color:var(--muted); margin-bottom:10px; }
+  .act-row { display:flex; gap:10px; align-items:baseline; padding:7px 10px; border-radius:8px;
+    background:rgba(255,255,255,.025); margin-bottom:5px; font-size:12.5px; }
+  .act-row .no { color:var(--muted); font-size:11px; min-width:16px; }
+  .act-row .nm { font-weight:700; min-width:64px; }
+  .act-row .why { color:var(--orange); flex:1; }
+  .act-row .ord { color:var(--text); font-variant-numeric:tabular-nums; text-align:right; }
+  .act-nobuy { padding:8px 10px; border-radius:8px; background:rgba(255,93,104,.08);
+    font-size:12px; margin-top:8px; }
+  .act-effect { margin-top:8px; font-size:12px; color:var(--green); }
+
   .grid { display:grid; grid-template-columns: 360px 1fr 340px; gap:16px; margin-top:16px; align-items:start; }
   @media (max-width: 1150px) { .grid { grid-template-columns: 1fr; } header { position:static; } }
   .col { display:flex; flex-direction:column; gap:16px; min-width:0; }
@@ -380,6 +394,8 @@
 
   <div class="banner" id="banner">⚠️ 加载中…</div>
   <div class="banner" id="acctNote" style="display:none;background:linear-gradient(90deg, rgba(255,159,67,.26), rgba(255,159,67,.08));border-color:#5a3a15;color:#ffd9a8;"></div>
+
+  <div id="actionCard" class="card action-card" style="display:none;"></div>
 
   <div class="grid">
     <!-- 左列：账户状态 -->
@@ -670,6 +686,40 @@ const fmt = n => (n == null ? '--' : Number(n).toLocaleString('zh-CN', {maximumF
 const pct = n => (n == null ? '--' : (n > 0 ? '+' : '') + Number(n).toFixed(2) + '%');
 const colorFor = v => v > 0 ? 'c-red' : v < 0 ? 'c-green' : 'muted';
 function esc(s) { return (s == null ? '' : String(s)).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+/* ── 行动卡（说人话） ── */
+async function loadActionCard() {
+  const el = document.getElementById('actionCard');
+  if (!el) return;
+  try {
+    const r = await api('/api/action');
+    const hasSell = (r.sells || []).length > 0;
+    if (!hasSell && r.can_buy) { el.style.display = 'none'; return; }
+    el.style.display = 'block';
+    const rows = (r.sells || []).map((x, i) => `
+      <div class="act-row">
+        <span class="no">${i + 1}</span>
+        <span class="nm">${esc(x.name)}</span>
+        <span class="why">${esc(x.why)}${x.detail ? ' · ' + esc(x.detail) : ''}</span>
+        <span class="ord">${esc(x.order)}</span>
+      </div>`).join('');
+    const nobuy = (r.no_buy_reasons || []).length
+      ? `<div class="act-nobuy">⛔ <b>现在不要买</b>：${r.no_buy_reasons.map(esc).join('；')}</div>` : '';
+    const buys = (r.buy || []).length
+      ? `<div class="act-effect" style="color:var(--text)">✅ 可以小仓位买：` +
+        r.buy.map(b => esc(b.name) + '（' + esc(b.grade) + ' 级）').join('、') + `</div>` : '';
+    const eff = r.effect && r.effect.text
+      ? `<div class="act-effect">💰 ${esc(r.effect.text)}</div>` : '';
+    el.innerHTML = `
+      <h2 style="margin-bottom:6px;">📌 现在该做什么 <span class="tag">${esc(r.date || '')}</span></h2>
+      <div class="verdict">${esc(r.verdict)}</div>
+      <div class="ctx">${esc(r.context || '')}</div>
+      ${rows}${nobuy}${buys}${eff}
+      <div class="dim" style="font-size:10.5px;margin-top:8px;">${esc(r.note || '')}</div>`;
+  } catch (e) {
+    el.style.display = 'none';
+  }
+}
 
 /* ── 融资成本 ── */
 async function loadFinancing() {
@@ -1576,7 +1626,7 @@ function render() {
   renderHeader(); renderHealth(); renderAssets(); renderGate(); renderPositions();
   renderSell(); renderBuy(); renderDeleverage(); renderSwap(); renderSummary();
   renderMarket(); renderMacro(); renderSectors(); renderPools();
-  renderStrategy(); loadTodo(); loadSignals(); loadEquity(); loadPortfolioBt(); loadWatchpool(); loadFactor(); loadRescue(); loadJwatch(); loadFundamental(); loadBuypoint(); loadFinancing();
+  renderStrategy(); loadTodo(); loadSignals(); loadEquity(); loadPortfolioBt(); loadWatchpool(); loadFactor(); loadRescue(); loadJwatch(); loadFundamental(); loadBuypoint(); loadFinancing(); loadActionCard();
 }
 
 /* 底部一句话策略：把「模式 + 卖点 + 仓位 + 市场温度」压成一句能直接照做的话 */
