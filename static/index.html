@@ -166,6 +166,18 @@
   .toolbox .card { border:none; border-radius:0; box-shadow:none; background:transparent; }
   .toolbox .card + .card { border-top:1px dashed var(--border); }
 
+  .more-panel { margin-top:16px; border:1px solid var(--border); border-radius:14px;
+    background:rgba(255,255,255,.015); overflow:hidden; }
+  .more-panel > summary { cursor:pointer; padding:13px 18px; font-weight:700; font-size:13.5px;
+    list-style:none; display:flex; gap:8px; align-items:baseline; }
+  .more-panel > summary::-webkit-details-marker { display:none; }
+  .more-panel > summary::after { content:'▾'; margin-left:auto; color:var(--dim); font-size:12px; }
+  .more-panel[open] > summary::after { content:'▴'; }
+  .more-panel[open] > summary { border-bottom:1px solid var(--border); }
+  .more-grid { display:grid; grid-template-columns:repeat(3, 1fr); gap:16px; padding:16px; align-items:start; }
+  .more-grid .card { background:rgba(255,255,255,.02); }
+  @media (max-width:1150px) { .more-grid { grid-template-columns:1fr; } }
+
   .action-card { margin-bottom:16px; border:1px solid rgba(255,93,104,.35);
     background:linear-gradient(180deg, rgba(255,93,104,.07), rgba(20,22,30,.6)); }
   .action-card .verdict { font-size:17px; font-weight:800; margin-bottom:4px; }
@@ -398,200 +410,186 @@
   <div id="actionCard" class="card action-card" style="display:none;"></div>
 
   <div class="grid">
-    <!-- 左列：账户状态 -->
+    <!-- 左列：账户与风险 -->
     <div class="col">
-      <div class="card">
-        <h2>📊 账户健康度 <span class="tag">系统总开关</span></h2>
-        <div id="healthPanel"></div>
-      </div>
-
-      <div class="card">
-        <h2>💰 资金结构</h2>
-        <div class="field"><label>现金（元）</label><input id="cashInput" type="number" step="1000"></div>
-        <div class="field"><label>融资余额（元）</label><input id="finInput" type="number" step="1000"></div>
-        <div class="btnbar"><button class="primary" onclick="saveAccount()">保存资金</button></div>
-        <div id="assetPanel" style="margin-top:12px;"></div>
-      </div>
-
-      <div class="card">
-        <h2>🏦 融资成本 <span class="tag">每月底的现金支出</span></h2>
-        <div id="finCostPanel"><div class="loading"><span class="spinner"></span>计算中…</div></div>
-      </div>
-
-      <div class="card">
-        <h2>📈 资产与杠杆 <span class="tag">净值 / 回撤</span></h2>
-        <div id="equityPanel"><div class="dim" style="font-size:12px;">加载中…</div></div>
-      </div>
-
-      <div class="card">
-        <h2>⚙️ 仓位限制 <span class="tag">强制风控</span></h2>
-        <div id="gatePanel"></div>
-      </div>
-
-      <div class="card">
-        <h2>📦 持仓明细 <span class="tag" id="posCount"></span></h2>
-        <div class="btnbar" style="margin-bottom:8px;">
-          <button class="sm" onclick="openImport()">⇪ 批量导入</button>
-          <button class="sm" onclick="openModal()">＋ 单只添加</button>
-        </div>
-        <div class="scroll" id="posPanel"></div>
-      </div>
+    <div class="card">
+            <h2>📊 账户健康度 <span class="tag">系统总开关</span></h2>
+            <div id="healthPanel"></div>
+          </div>
+    <div class="card">
+            <h2>💰 资金结构</h2>
+            <div class="field"><label>现金（元）</label><input id="cashInput" type="number" step="1000"></div>
+            <div class="field"><label>融资余额（元）</label><input id="finInput" type="number" step="1000"></div>
+            <div class="btnbar"><button class="primary" onclick="saveAccount()">保存资金</button></div>
+            <div id="assetPanel" style="margin-top:12px;"></div>
+          </div>
+    <div class="card">
+            <h2>🏦 融资成本 <span class="tag">每月底的现金支出</span></h2>
+            <div id="finCostPanel"><div class="loading"><span class="spinner"></span>计算中…</div></div>
+          </div>
+    <div class="card">
+            <h2>⚙️ 仓位限制 <span class="tag">强制风控</span></h2>
+            <div id="gatePanel"></div>
+          </div>
+    
+    <div class="card">
+                <h2>📈 资产与杠杆 <span class="tag">净值 / 回撤</span></h2>
+                <div id="equityPanel"><div class="dim" style="font-size:12px;">加载中…</div></div>
+              </div>
     </div>
 
-    <!-- 中列：决策指令流 -->
+    <!-- 中列：今天做什么 -->
     <div class="col">
-      <div class="card">
-        <h2>📋 <span id="todoTitle">今日待办</span> <span class="tag">先卖后买 · 可复制</span></h2>
-        <div class="btnbar">
-          <button class="primary" onclick="loadTodo()">生成清单</button>
-          <button onclick="copyTodo()">复制文本</button>
-        </div>
-        <div id="todoPanel" style="margin-top:10px;"><div class="dim" style="font-size:12px;">点「生成清单」把今天的卖出/买点压成一张按顺序执行的单子</div></div>
-      </div>
-
-      <div class="card">
-        <h2>🛟 解套降本作战 <span class="tag">回本距离 · 做T方案</span></h2>
-        <div id="rescuePanel"><div class="loading"><span class="spinner"></span>计算中…</div></div>
-      </div>
-
-      <div class="card">
-        <h2>🚨 卖出优先指令流 <span class="tag">先卖后买</span></h2>
-        <div id="sellPanel"></div>
-      </div>
-
-      <div class="card legacy">
-        <h2>🛒 买点推荐 <span class="tag">多策略投票</span></h2>
-        <div id="buyPanel"></div>
-      </div>
-
-      <div class="card">
-        <h2>🧪 持仓战法体检 <span class="tag">共识度 · 不是选秀</span></h2>
-        <div class="row" style="align-items:center;margin-bottom:6px;">
-          <div class="dim" id="pbtMeta" style="font-size:11px;flex:1;">加载中…</div>
-          <button class="sm" style="flex:none" onclick="loadPortfolioBt(true)">重新计算</button>
-        </div>
-        <div id="hwStrip"></div>
-        <div id="pbtPanel"><div class="loading"><span class="spinner"></span>读取缓存…</div></div>
-      </div>
-
-      <div class="card">
-        <h2>🔍 精选选股 <span class="tag">全市场扫描</span></h2>
-        <div class="btnbar"><button class="primary" onclick="runScreener()">🔄 扫描全市场</button></div>
-        <div id="screenerPanel" style="margin-top:10px;"></div>
-      </div>
-
-      <div class="card">
-        <h2>🪜 分步降杠杆路径 <span class="tag">避免割在最低点</span></h2>
-        <div id="deleveragePanel"></div>
-      </div>
-
-      <div class="card legacy">
-        <h2>🔁 换股配对 <span class="tag">砍谁 → 买谁</span></h2>
-        <div id="swapPanel"></div>
-      </div>
-
-      <div class="card legacy">
-        <h2>📝 综合决策摘要</h2>
-        <div id="summaryPanel"></div>
-      </div>
+    <div class="card">
+            <h2>📋 <span id="todoTitle">今日待办</span> <span class="tag">先卖后买 · 可复制</span></h2>
+            <div class="btnbar">
+              <button class="primary" onclick="loadTodo()">生成清单</button>
+              <button onclick="copyTodo()">复制文本</button>
+            </div>
+            <div id="todoPanel" style="margin-top:10px;"><div class="dim" style="font-size:12px;">点「生成清单」把今天的卖出/买点压成一张按顺序执行的单子</div></div>
+          </div>
+    <div class="card">
+            <h2>🛟 解套降本作战 <span class="tag">回本距离 · 做T方案</span></h2>
+            <div id="rescuePanel"><div class="loading"><span class="spinner"></span>计算中…</div></div>
+          </div>
+    <div class="card">
+            <h2>🚨 卖出优先指令流 <span class="tag">先卖后买</span></h2>
+            <div id="sellPanel"></div>
+          </div>
     </div>
 
-    <!-- 右列：市场环境 -->
+    <!-- 右列：市场与选股 -->
     <div class="col">
-      <div class="card">
-        <h2>🌡️ 市场环境</h2>
-        <div id="marketPanel"></div>
-      </div>
-
-      <div class="card">
-        <h2>📊 信号复盘 <span class="tag">T+5 验证</span></h2>
-        <div id="signalPanel"><div class="dim" style="font-size:12px;">加载中…</div></div>
-      </div>
-
-      <div class="card">
-        <h2>🌍 外围宏观 <span class="tag">美联储/大宗</span></h2>
-        <div id="macroPanel"></div>
-      </div>
-
-            <div class="card">
-        <h2>🎯 买点体检 <span class="tag">位置 + 趋势 + 基本面</span></h2>
-        <div id="buypointPanel"><div class="loading"><span class="spinner"></span>计算中…</div></div>
-      </div>
-
-      <div class="card">
-        <h2>📊 基本面趋势 <span class="tag">连续几期在恶化</span></h2>
-        <div id="fundPanel"><div class="loading"><span class="spinner"></span>读取财报（首次较慢）…</div></div>
-      </div>
-
-      <div class="card">
-        <h2>📉 J 值监控 <span class="tag">日线 / 周线</span></h2>
-        <div id="jwatchPanel"><div class="loading"><span class="spinner"></span>计算中…</div></div>
-        <div class="dim" style="font-size:10px;margin-top:6px;">
-          日线单独负值是负超额（−2.3%）；要等周线也低才算真买点
-        </div>
-      </div>
-
-<div class="card legacy">
-        <h2>📈 持仓板块表现</h2>
-        <div id="sectorPanel"></div>
-      </div>
-
-      <div class="card legacy">
-        <h2>🏊 持仓池分布 <span class="tag">五池</span></h2>
-        <div id="poolPanel"></div>
-      </div>
-
-      <div class="card">
-        <h2>🎯 自选池 <span class="tag">短/中/长 · 自我迭代</span></h2>
-        <div class="row" style="align-items:center;margin-bottom:8px;">
-          <div class="dim" id="wpMeta" style="font-size:11px;flex:1;">加载中…</div>
-          <button class="sm" style="flex:none" onclick="runWatchpool()">运行选股/复盘</button>
-        </div>
-        <div id="wpPanel"><div class="loading"><span class="spinner"></span>读取自选池…</div></div>
-      </div>
-
-      <div class="card">
-        <h2>📊 选股有效性 <span class="tag">进池→出池实盘</span></h2>
-        <div id="wpEval"><div class="dim" style="font-size:12px;">加载中…</div></div>
-      </div>
-
-      <div class="card legacy">
-        <h2>⚖️ 选股策略对比 <span class="tag">历史回测排名</span></h2>
-        <div id="factorPanel"><div class="dim" style="font-size:12px;">加载中…</div></div>
-      </div>
-
-      <details class="toolbox">
-        <summary>🔧 工具箱 · 模拟回测 / 参数寻优 / 长中短对比
-          <span class="dim" style="font-weight:400;font-size:11px;">（低频工具，平时收起）</span></summary>
-
-      <div class="card">
-        <h2>🧪 模拟回测 <span class="tag">多周期</span></h2>
-        <div class="row">
-          <input id="btCode" placeholder="代码 如 600036">
-          <select id="btPeriod" style="background:#0c1220;border:1px solid var(--border);color:var(--text);border-radius:9px;padding:8px 10px;font-size:13px;">
-            <option value="daily">日线</option>
-            <option value="weekly">周线</option>
-            <option value="120">2小时</option>
-            <option value="60">1小时</option>
-            <option value="30">30分钟</option>
-          </select>
-        </div>
-        <div class="btnbar"><button class="primary" onclick="runPlaybook()">🚀 一键决策</button><button onclick="runBacktest()">只跑回测</button><button onclick="runHorizons()">🧭 长/中/短</button></div>
-        <div class="dim" style="font-size:11px;margin-top:6px;">示例：600519 茅台 · 601899 紫金 · 300750 宁德 · 688981 中芯（6位沪/深/创/科代码）</div>
-        <div id="btResult" style="margin-top:10px;"></div>
-      </div>
-
-      <div class="card">
-        <h2>🔍 参数寻优 <span class="tag">多周期</span></h2>
-        <div class="row"><input id="optCode" placeholder="代码 如 601899"></div>
-        <div class="btnbar">
-          <button class="primary" onclick="runOptimize('win_rate')">🎯 胜率优先（降本）</button>
-          <button onclick="runOptimize('return')">收益优先</button>
-        </div>
-        <div id="optResult" style="margin-top:10px;"></div>
-      </div>
-      </details>
+    <div class="card">
+            <h2>🌡️ 市场环境</h2>
+            <div id="marketPanel"></div>
+          </div>
+    <div class="card">
+            <h2>🎯 买点体检 <span class="tag">位置 + 趋势 + 基本面</span></h2>
+            <div id="buypointPanel"><div class="loading"><span class="spinner"></span>计算中…</div></div>
+          </div>
+    <div class="card">
+            <h2>📊 基本面趋势 <span class="tag">连续几期在恶化</span></h2>
+            <div id="fundPanel"><div class="loading"><span class="spinner"></span>读取财报（首次较慢）…</div></div>
+          </div>
+    <div class="card">
+                <h2>📦 持仓明细 <span class="tag" id="posCount"></span></h2>
+                <div class="btnbar" style="margin-bottom:8px;">
+                  <button class="sm" onclick="openImport()">⇪ 批量导入</button>
+                  <button class="sm" onclick="openModal()">＋ 单只添加</button>
+                </div>
+                <div class="scroll" id="posPanel"></div>
+              </div>
+    
     </div>
+  </div>
+
+  <details class="more-panel">
+    <summary>📂 更多分析
+      <span class="dim" style="font-weight:400;font-size:11px;">信号复盘 / 外围宏观 / J值 / 自选池 / 战法体检 / 选股有效性 / 降杠杆路径</span>
+    </summary>
+    <div class="more-grid">
+    <div class="card">
+            <h2>📊 信号复盘 <span class="tag">T+5 验证</span></h2>
+            <div id="signalPanel"><div class="dim" style="font-size:12px;">加载中…</div></div>
+          </div>
+    <div class="card">
+            <h2>🌍 外围宏观 <span class="tag">美联储/大宗</span></h2>
+            <div id="macroPanel"></div>
+          </div>
+    <div class="card">
+            <h2>📉 J 值监控 <span class="tag">日线 / 周线</span></h2>
+            <div id="jwatchPanel"><div class="loading"><span class="spinner"></span>计算中…</div></div>
+            <div class="dim" style="font-size:10px;margin-top:6px;">
+              日线单独负值是负超额（−2.3%）；要等周线也低才算真买点
+            </div>
+          </div>
+    <div class="card">
+            <h2>🎯 自选池 <span class="tag">短/中/长 · 自我迭代</span></h2>
+            <div class="row" style="align-items:center;margin-bottom:8px;">
+              <div class="dim" id="wpMeta" style="font-size:11px;flex:1;">加载中…</div>
+              <button class="sm" style="flex:none" onclick="runWatchpool()">运行选股/复盘</button>
+            </div>
+            <div id="wpPanel"><div class="loading"><span class="spinner"></span>读取自选池…</div></div>
+          </div>
+    <div class="card">
+            <h2>📊 选股有效性 <span class="tag">进池→出池实盘</span></h2>
+            <div id="wpEval"><div class="dim" style="font-size:12px;">加载中…</div></div>
+          </div>
+    <div class="card">
+            <h2>🧪 持仓战法体检 <span class="tag">共识度 · 不是选秀</span></h2>
+            <div class="row" style="align-items:center;margin-bottom:6px;">
+              <div class="dim" id="pbtMeta" style="font-size:11px;flex:1;">加载中…</div>
+              <button class="sm" style="flex:none" onclick="loadPortfolioBt(true)">重新计算</button>
+            </div>
+            <div id="hwStrip"></div>
+            <div id="pbtPanel"><div class="loading"><span class="spinner"></span>读取缓存…</div></div>
+          </div>
+    <div class="card">
+            <h2>🪜 分步降杠杆路径 <span class="tag">避免割在最低点</span></h2>
+            <div id="deleveragePanel"></div>
+          </div>
+    <div class="card">
+            <h2>🔍 精选选股 <span class="tag">全市场扫描</span></h2>
+            <div class="btnbar"><button class="primary" onclick="runScreener()">🔄 扫描全市场</button></div>
+            <div id="screenerPanel" style="margin-top:10px;"></div>
+          </div>
+    <div class="card legacy">
+            <h2>🛒 买点推荐 <span class="tag">多策略投票</span></h2>
+            <div id="buyPanel"></div>
+          </div>
+    <div class="card legacy">
+            <h2>🔁 换股配对 <span class="tag">砍谁 → 买谁</span></h2>
+            <div id="swapPanel"></div>
+          </div>
+    <div class="card legacy">
+            <h2>📝 综合决策摘要</h2>
+            <div id="summaryPanel"></div>
+          </div>
+    <div class="card legacy">
+            <h2>📈 持仓板块表现</h2>
+            <div id="sectorPanel"></div>
+          </div>
+    <div class="card legacy">
+            <h2>🏊 持仓池分布 <span class="tag">五池</span></h2>
+            <div id="poolPanel"></div>
+          </div>
+    <div class="card legacy">
+            <h2>⚖️ 选股策略对比 <span class="tag">历史回测排名</span></h2>
+            <div id="factorPanel"><div class="dim" style="font-size:12px;">加载中…</div></div>
+          </div>
+    </div>
+  </details>
+
+  <details class="toolbox" style="margin-top:12px;">
+    <summary>🔧 工具箱 · 模拟回测 / 参数寻优
+      <span class="dim" style="font-weight:400;font-size:11px;">（低频工具，平时收起）</span></summary>
+    <div class="card">
+            <h2>🧪 模拟回测 <span class="tag">多周期</span></h2>
+            <div class="row">
+              <input id="btCode" placeholder="代码 如 600036">
+              <select id="btPeriod" style="background:#0c1220;border:1px solid var(--border);color:var(--text);border-radius:9px;padding:8px 10px;font-size:13px;">
+                <option value="daily">日线</option>
+                <option value="weekly">周线</option>
+                <option value="120">2小时</option>
+                <option value="60">1小时</option>
+                <option value="30">30分钟</option>
+              </select>
+            </div>
+            <div class="btnbar"><button class="primary" onclick="runPlaybook()">🚀 一键决策</button><button onclick="runBacktest()">只跑回测</button><button onclick="runHorizons()">🧭 长/中/短</button></div>
+            <div class="dim" style="font-size:11px;margin-top:6px;">示例：600519 茅台 · 601899 紫金 · 300750 宁德 · 688981 中芯（6位沪/深/创/科代码）</div>
+            <div id="btResult" style="margin-top:10px;"></div>
+          </div>
+    <div class="card">
+            <h2>🔍 参数寻优 <span class="tag">多周期</span></h2>
+            <div class="row"><input id="optCode" placeholder="代码 如 601899"></div>
+            <div class="btnbar">
+              <button class="primary" onclick="runOptimize('win_rate')">🎯 胜率优先（降本）</button>
+              <button onclick="runOptimize('return')">收益优先</button>
+            </div>
+            <div id="optResult" style="margin-top:10px;"></div>
+          </div>
+  </details>
   </div>
 
   <footer>
@@ -765,7 +763,7 @@ async function loadBuypoint() {
   if (!el) return;
   try {
     const r = await api('/api/buypoint');
-    const rows = (r.rows || []).map(x => {
+    const rowHtml = x => {
       const c = BUY_COLOR[x.grade] || 'var(--muted)';
       return `<div style="padding:6px 0;border-bottom:1px dashed #1c2739;">
         <div style="display:flex;justify-content:space-between;align-items:baseline;gap:6px;">
@@ -780,7 +778,14 @@ async function loadBuypoint() {
           · 基本面 ${esc((x.fundamental || {}).label || '—')}
         </div>
       </div>`;
-    }).join('');
+    };
+    const all = (r.rows || []);
+    const HEAD = 6;
+    const head = all.slice(0, HEAD).map(rowHtml).join('');
+    const rest = all.slice(HEAD).map(rowHtml).join('');
+    const rows = head + (all.length > HEAD
+      ? `<details><summary style="cursor:pointer;font-size:11px;color:var(--muted);padding:6px 0;list-style:none;">
+           ▸ 还有 ${all.length - HEAD} 只</summary>${rest}</details>` : '');
     const cnt = r.counts || {};
     const season = (r.rows || []).some(x => x.earnings_season);
     el.innerHTML = `<div class="dim" style="font-size:10.5px;margin-bottom:6px;">
@@ -1313,7 +1318,7 @@ async function loadTodo() {
   try {
     const r = await api('/api/todo');
     window.__todoText = r.text || '';
-    const items = (r.items || []).map((it, i) => {
+    const renderItem = (it, i) => {
       const cls = it.kind === 'sell'
         ? (it.level === 'red' ? 'c-red' : it.level === 'orange' ? 'c-orange' : 'c-yellow')
         : it.kind === 'buy' ? 'c-green'
@@ -1327,7 +1332,14 @@ async function loadTodo() {
         <div class="top"><span class="name">${title}</span>
           ${it.name ? `<span class="${cls}" style="font-weight:700;font-size:12px;flex:none">${esc(it.action)}</span>` : ''}</div>
         ${qty}${reason}</div>`;
-    }).join('');
+    };
+    const all = r.items || [];
+    const HEAD = 5;
+    const items = all.slice(0, HEAD).map(renderItem).join('')
+      + (all.length > HEAD
+        ? `<details><summary style="cursor:pointer;font-size:11px;color:var(--muted);padding:6px 0;list-style:none;">
+             ▸ 还有 ${all.length - HEAD} 笔</summary>${all.slice(HEAD).map((x, k) => renderItem(x, k + HEAD)).join('')}</details>`
+        : '');
     const pos = r.position || {};
     const closed = r.trading_day === false;
     const ttl = document.getElementById('todoTitle');
