@@ -45,8 +45,17 @@ def level_from_score(score: int) -> SellLevel:
     return SellLevel.HOLD
 
 
-def check_hard_stop(pos: Position, mode: Mode) -> Optional[_Candidate]:
-    """硬止损：价格跌破止损线（固定百分比，成本锚定）。深套持仓不机械割肉。"""
+def check_hard_stop(pos: Position, mode: Mode, ma20: Optional[float] = None) -> Optional[_Candidate]:
+    """硬止损：跌破止损线 + 趋势确实走坏。
+
+    两个前提，缺一不可：
+      1) 价格跌破 成本 ×(1+止损%)；
+      2) 价格在 20 日均线下方（趋势已破坏）。
+
+    只看第 1 条会出错：一只从 −16% 反弹到 −7.6% 的票，价格虽然还在成本线下方，
+    但当天可能是涨停、趋势向上——那不叫"止损"，那是"卖在起涨点"。
+    深套（比止损线再深 deep_underwater_margin）的持仓同样不机械割肉。
+    """
     m = config.get_mode(mode)
     stop_pct = m["stop_loss"]  # 负数，如 -3
     deep_margin = config.get_exit_rules()["stop_loss"]["deep_underwater_margin"]
@@ -55,6 +64,9 @@ def check_hard_stop(pos: Position, mode: Mode) -> Optional[_Candidate]:
 
     # 已深套：比止损线再深 deep_margin 个百分点，改由时间/基本面止损主导
     if pos.pnl_ratio < (stop_pct - deep_margin):
+        return None
+    # 趋势未破（仍在 20 日线上方）：不按成本线机械卖出
+    if ma20 and cur > ma20:
         return None
     if cur <= stop_price:
         return _Candidate(
@@ -228,7 +240,7 @@ def scan_positions(
         f = facts.get(pos.code, {})
         candidates: list[_Candidate] = []
 
-        c = check_hard_stop(pos, mode)
+        c = check_hard_stop(pos, mode, f.get("ma20"))
         if c:
             candidates.append(c)
 
@@ -265,6 +277,14 @@ def scan_positions(
         base = primary.base_score
         bonus = min(severity_cfg["multi_signal_cap"], severity_cfg["multi_signal_bonus"] * (len(candidates) - 1))
         score = min(100, base + bonus)
+
+        # 今日涨停/大涨：不市价砸盘，改成限价（挂更高价等买盘）
+        surge_note = ""
+        gain = f.get("gain_pct")
+        if gain is not None and gain >= 9.0:
+            for c in candidates:
+                c.execution = "limit_order"
+            surge_note = f"（今日已涨 {gain:.1f}%，不市价卖，挂限价等买盘）"
 
         # 财报季：技术类卖点降权，避免被财报跳空制造的假跌破骗出场
         season_note = ""
@@ -312,7 +332,7 @@ def scan_positions(
                 mechanism=primary.mechanism,
                 severity_score=score,
                 level=level,
-                reason="；".join(reason_parts) + season_note,
+                reason="；".join(reason_parts) + season_note + surge_note,
                 suggested_price=suggested,
                 execution=primary.execution,
                 flight_defense=flight,

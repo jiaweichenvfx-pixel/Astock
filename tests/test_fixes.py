@@ -167,3 +167,24 @@ def test_action_card_profit_label(monkeypatch):
     assert "浮盈" in r["sells"][0]["detail"]
     assert "浮亏" not in r["sells"][0]["detail"]
     assert "没有卖点" in r["sells"][0]["why"]
+
+
+# 10) 硬止损必须要求趋势走坏：反弹中的票不能被成本线误杀
+def test_hard_stop_requires_downtrend(monkeypatch):
+    from app.engine import sell
+    from app.schemas import Position
+
+    monkeypatch.setattr(sell.config, "get_mode", lambda m: {"stop_loss": -5})
+    monkeypatch.setattr(sell.config, "get_exit_rules", lambda: {
+        "stop_loss": {"deep_underwater_margin": 3.0}})
+
+    # 成本 22.26，现价 20.57（亏 -7.6%），低于止损线 21.15
+    pos = Position(code="600754", name="锦江酒店", shares=100, cost_price=22.26,
+                   current_price=20.57, rating=None)
+
+    # 趋势向上（MA20=18.06，价格在均线上方）→ 不应触发止损
+    assert sell.check_hard_stop(pos, sell.Mode.BALANCE, ma20=18.06) is None
+
+    # 趋势走坏（MA20=22.0，价格在均线下方）→ 该触发
+    c = sell.check_hard_stop(pos, sell.Mode.BALANCE, ma20=22.0)
+    assert c is not None and c.mechanism.value == "hard_stop"
