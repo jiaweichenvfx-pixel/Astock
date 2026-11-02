@@ -102,6 +102,39 @@ def check_time_stop(
     )
 
 
+def check_drawdown_stop(pos: Position, dd_60d: Optional[float]) -> Optional[_Candidate]:
+    """回撤止损（跟踪止损）：从 60 日最高价回撤过大就减。
+
+    成本锚定的止损在深套账户上完全失效（成本线离现价太远，永远不触发），
+    而回撤止损只看「离自己最高点跌了多少」，对任何成本都成立。
+
+    - 回撤 ≥30%：趋势崩塌，橙色提示
+    - 有浮盈且回撤 ≥15%：利润回吐，黄色提示
+    """
+    if dd_60d is None:
+        return None
+    rules = config.get_exit_rules().get("drawdown_stop") or {}
+    crash = rules.get("crash_pct", -30.0)
+    give_back = rules.get("give_back_pct", -15.0)
+    profit_gate = rules.get("profit_gate", 10.0)
+
+    cur = pos.current_price if pos.current_price is not None else pos.cost_price
+    if dd_60d <= crash:
+        return _Candidate(
+            SellMechanism.TECHNICAL, 68,
+            f"从 60 日最高价回撤 {abs(dd_60d):.0f}%，趋势崩塌",
+            "limit_order", cur,
+        )
+    if pos.pnl_ratio >= profit_gate and dd_60d <= give_back:
+        return _Candidate(
+            SellMechanism.TECHNICAL, 55,
+            f"浮盈从最高 {pos.pnl_ratio - dd_60d:+.0f}% 回吐到 {pos.pnl_ratio:+.0f}%"
+            f"（回撤 {abs(dd_60d):.0f}%），锁住利润",
+            "limit_order", cur,
+        )
+    return None
+
+
 def check_fundamental_stop(pos: Position, q: Optional[QualityInfo]) -> Optional[_Candidate]:
     """基本面止损：ST/连续亏损（黑名单）、增速崩塌、ROE 下滑。"""
     rules = config.get_exit_rules()["fundamental_stop"]
@@ -241,6 +274,10 @@ def scan_positions(
         candidates: list[_Candidate] = []
 
         c = check_hard_stop(pos, mode, f.get("ma20"))
+        if c:
+            candidates.append(c)
+
+        c = check_drawdown_stop(pos, f.get("dd_60d"))
         if c:
             candidates.append(c)
 

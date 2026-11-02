@@ -34,6 +34,8 @@ def compute_tech(closes: list[float]) -> dict:
         "macd_hist": ind.macd(closes)["hist"][-1] if closes else None,
         "macd_divergence": ind.macd_bearish_divergence(closes),
         "momentum_60": ind.momentum_return(closes, p["momentum_days"]),
+        "dd_60d": round((closes[-1] / max(closes[-60:]) - 1) * 100, 2)
+        if closes and len(closes) >= 20 and max(closes[-60:]) > 0 else None,
     }
 
 

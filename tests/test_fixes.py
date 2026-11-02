@@ -188,3 +188,36 @@ def test_hard_stop_requires_downtrend(monkeypatch):
     # 趋势走坏（MA20=22.0，价格在均线下方）→ 该触发
     c = sell.check_hard_stop(pos, sell.Mode.BALANCE, ma20=22.0)
     assert c is not None and c.mechanism.value == "hard_stop"
+
+
+# 11) 回撤止损：成本锚定止损在深套账户上失效，要用「离最高点跌多少」
+def test_drawdown_stop_crash(monkeypatch):
+    from app.engine import sell
+    from app.schemas import Position
+    monkeypatch.setattr(sell.config, "get_exit_rules", lambda: {
+        "drawdown_stop": {"crash_pct": -30.0, "give_back_pct": -15.0, "profit_gate": 10.0}})
+
+    # 成本 16.53，现价 18.52（仍浮盈 +12%），但从 27.96 跌到 18.52 = -33.8%
+    pos = Position(code="600489", name="中金黄金", shares=100, cost_price=16.53,
+                   current_price=18.52, rating=None)
+    c = sell.check_drawdown_stop(pos, -33.8)
+    assert c is not None
+    assert c.base_score == 68
+    assert "回撤" in c.reason
+
+
+def test_drawdown_stop_give_back(monkeypatch):
+    from app.engine import sell
+    from app.schemas import Position
+    monkeypatch.setattr(sell.config, "get_exit_rules", lambda: {
+        "drawdown_stop": {"crash_pct": -30.0, "give_back_pct": -15.0, "profit_gate": 10.0}})
+    pos = Position(code="600000", name="测试", shares=100, cost_price=10.0,
+                   current_price=12.0, rating=None)   # 浮盈 +20%
+    c = sell.check_drawdown_stop(pos, -18.0)
+    assert c is not None and c.base_score == 55
+    # 回撤不大时不触发
+    assert sell.check_drawdown_stop(pos, -5.0) is None
+    # 没浮盈时也不谈锁利润
+    pos2 = Position(code="600000", name="测试", shares=100, cost_price=10.0,
+                    current_price=9.0, rating=None)
+    assert sell.check_drawdown_stop(pos2, -18.0) is None

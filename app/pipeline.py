@@ -170,6 +170,7 @@ def build_facts(account: Account, quotes: dict, tech: dict) -> dict[str, dict]:
             "gain_pct": q.get("pct_chg"),
             "rsi": t.get("rsi"),
             "ma20": t.get("ma20"),
+            "dd_60d": t.get("dd_60d"),
             "macd_divergence": bool(t.get("macd_divergence")),
             "sector_rps": None if is_hk else _rps_60d(chg60, universe),
             "net_inflow_days": flow["inflow_days"] if flow.get("available") else None,
