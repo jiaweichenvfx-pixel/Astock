@@ -618,6 +618,19 @@ def portfolio_bt_view(force: bool = False, date: Optional[str] = None):
 
 
 # ── 今日待办 / 信号复盘 ────────────────────────────────────────
+@router.get("/api/profit-guard")
+def profit_guard_view():
+    """盈利保护：浮盈超过 10% 的持仓，盯超买信号锁利润。"""
+    from .engine import profit_guard
+
+    acc = storage.load_account()
+    try:
+        pipeline.enrich_account(acc, adapter.get_quotes([p.code for p in acc.positions]))
+    except Exception:
+        pass
+    return profit_guard.scan(acc)
+
+
 @router.get("/api/action")
 def action_view():
     """行动卡：一眼看懂现在该做什么（说人话，不用懂战法）。"""

@@ -473,6 +473,10 @@
             <div id="fundPanel"><div class="loading"><span class="spinner"></span>读取财报（首次较慢）…</div></div>
           </div>
     <div class="card">
+            <h2>🛡️ 盈利保护 <span class="tag">浮盈 10% 起监控</span></h2>
+            <div id="profitGuardPanel"><div class="loading"><span class="spinner"></span>扫描中…</div></div>
+          </div>
+    <div class="card">
                 <h2>📦 持仓明细 <span class="tag" id="posCount"></span></h2>
                 <div class="btnbar" style="margin-bottom:8px;">
                   <button class="sm" onclick="openImport()">⇪ 批量导入</button>
@@ -684,6 +688,48 @@ const fmt = n => (n == null ? '--' : Number(n).toLocaleString('zh-CN', {maximumF
 const pct = n => (n == null ? '--' : (n > 0 ? '+' : '') + Number(n).toFixed(2) + '%');
 const colorFor = v => v > 0 ? 'c-red' : v < 0 ? 'c-green' : 'muted';
 function esc(s) { return (s == null ? '' : String(s)).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+/* ── 盈利保护 ── */
+const PG_STYLE = {
+  lock: ['var(--red)', '🔴', '卖出锁利润'],
+  weak: ['var(--orange)', '🟠', '趋势转弱'],
+  near: ['var(--yellow)', '🟡', '接近超买'],
+  ok: ['var(--green)', '🟢', '持有'],
+};
+async function loadProfitGuard() {
+  const el = document.getElementById('profitGuardPanel');
+  if (!el) return;
+  try {
+    const r = await api('/api/profit-guard');
+    if (!r.rows || !r.rows.length) {
+      el.innerHTML = '<div class="dim" style="font-size:11.5px;">当前没有浮盈超过 '
+        + (r.watch_pnl || 10) + '% 的持仓，无需锁利润。<div style="margin-top:4px;font-size:10.5px;">'
+        + esc(r.note || '') + '</div></div>';
+      return;
+    }
+    const rows = r.rows.map(x => {
+      const st = PG_STYLE[x.state] || PG_STYLE.ok;
+      const c = st[0], icon = st[1], tag = st[2];
+      return `<div style="padding:7px 0;border-bottom:1px dashed #1c2739;">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;">
+          <span style="font-size:12.5px;font-weight:700;">${icon} ${esc(x.name)}</span>
+          <span style="color:${c};font-weight:700;font-size:11.5px;">${esc(tag)} · ${x.pnl_ratio > 0 ? '+' : ''}${x.pnl_ratio}%</span>
+        </div>
+        <div class="dim" style="font-size:10.5px;margin-top:1px;">
+          RSI ${x.rsi == null ? '—' : x.rsi} · J ${x.j == null ? '—' : x.j}
+          · 距高点 ${x.dd_60d == null ? '—' : x.dd_60d + '%'}
+          ${x.divergence ? '· <span style="color:var(--orange)">顶背离</span>' : ''}
+        </div>
+        <div style="font-size:10.5px;color:${c};margin-top:1px;">${esc(x.why)}</div>
+        ${x.state === 'lock' ? '<div class="dim" style="font-size:10.5px;">建议先卖 ' + x.half_shares + ' 股（一半）</div>' : ''}
+      </div>`;
+    }).join('');
+    el.innerHTML = rows +
+      '<div class="dim" style="font-size:10px;margin-top:6px;">' + esc(r.note || '') + '</div>';
+  } catch (e) {
+    el.innerHTML = '<div class="dim">读取失败：' + esc(e.message) + '</div>';
+  }
+}
 
 /* ── 行动卡（说人话） ── */
 async function loadActionCard() {
@@ -1638,7 +1684,7 @@ function render() {
   renderHeader(); renderHealth(); renderAssets(); renderGate(); renderPositions();
   renderSell(); renderBuy(); renderDeleverage(); renderSwap(); renderSummary();
   renderMarket(); renderMacro(); renderSectors(); renderPools();
-  renderStrategy(); loadTodo(); loadSignals(); loadEquity(); loadPortfolioBt(); loadWatchpool(); loadFactor(); loadRescue(); loadJwatch(); loadFundamental(); loadBuypoint(); loadFinancing(); loadActionCard();
+  renderStrategy(); loadTodo(); loadSignals(); loadEquity(); loadPortfolioBt(); loadWatchpool(); loadFactor(); loadRescue(); loadJwatch(); loadFundamental(); loadBuypoint(); loadFinancing(); loadActionCard(); loadProfitGuard();
 }
 
 /* 底部一句话策略：把「模式 + 卖点 + 仓位 + 市场温度」压成一句能直接照做的话 */
