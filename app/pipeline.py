@@ -109,7 +109,7 @@ def compute_tech_map(codes: list[str]) -> dict[str, dict]:
         closes = [b["close"] for b in hist if b.get("close") is not None]
         if len(closes) < 30:
             continue
-        t = vote.compute_tech(closes)
+        t = vote.compute_tech(closes, hist)
         t["chg_60d"] = _chg_pct(closes, 60)
         t["annual_breakout"] = _annual_breakout(hist)
         tech[code] = t
@@ -171,6 +171,7 @@ def build_facts(account: Account, quotes: dict, tech: dict) -> dict[str, dict]:
             "rsi": t.get("rsi"),
             "ma20": t.get("ma20"),
             "dd_60d": t.get("dd_60d"),
+            "j": t.get("j"),
             "macd_divergence": bool(t.get("macd_divergence")),
             "sector_rps": None if is_hk else _rps_60d(chg60, universe),
             "net_inflow_days": flow["inflow_days"] if flow.get("available") else None,

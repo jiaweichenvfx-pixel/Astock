@@ -13,7 +13,19 @@ from . import indicators as ind
 
 
 # ── 技术指标打包（实时）─────────────────────────────────────────
-def compute_tech(closes: list[float]) -> dict:
+def _j_value(bars, closes) -> Optional[float]:
+    """日线 J 值；没有 OHLC 数据时返回 None。"""
+    if not bars or len(bars) < 10 or len(closes) != len(bars):
+        return None
+    try:
+        _k, _d, j = ind.kdj([b.get("high") or b["close"] for b in bars],
+                            [b.get("low") or b["close"] for b in bars], closes)
+        return j[-1] if j else None
+    except Exception:
+        return None
+
+
+def compute_tech(closes: list[float], bars: list = None) -> dict:
     """由收盘价序列计算全套技术指标（最新值）。"""
     p = config.load_config()["strategy_params"]
     ma5 = ind.last_valid(ind.sma(closes, p["ma_short"]))
@@ -34,6 +46,7 @@ def compute_tech(closes: list[float]) -> dict:
         "macd_hist": ind.macd(closes)["hist"][-1] if closes else None,
         "macd_divergence": ind.macd_bearish_divergence(closes),
         "momentum_60": ind.momentum_return(closes, p["momentum_days"]),
+        "j": _j_value(bars, closes),
         "dd_60d": round((closes[-1] / max(closes[-60:]) - 1) * 100, 2)
         if closes and len(closes) >= 20 and max(closes[-60:]) > 0 else None,
     }

@@ -221,3 +221,24 @@ def test_drawdown_stop_give_back(monkeypatch):
     pos2 = Position(code="600000", name="测试", shares=100, cost_price=10.0,
                     current_price=9.0, rating=None)
     assert sell.check_drawdown_stop(pos2, -18.0) is None
+
+
+# 12) 盈利保护：有浮盈 + 超买 → 锁利润
+def test_profit_protection(monkeypatch):
+    from app.engine import sell
+    from app.schemas import Position
+
+    pos = Position(code="600489", name="中金黄金", shares=100, cost_price=10.0,
+                   current_price=30.0, rating=None)   # 浮盈 +200%
+    c = sell.check_profit_protection(pos, rsi=87.8, j=101.9, divergence=False)
+    assert c is not None and c.base_score == 72
+    assert "锁" in c.reason
+
+    # 顶背离也能锁，但分数低一点
+    c2 = sell.check_profit_protection(pos, rsi=60, j=50, divergence=True)
+    assert c2 is not None and c2.base_score == 64
+
+    # 没浮盈不谈锁利润
+    flat = Position(code="600000", name="测试", shares=100, cost_price=10.0,
+                    current_price=10.2, rating=None)
+    assert sell.check_profit_protection(flat, rsi=90, j=110, divergence=True) is None
