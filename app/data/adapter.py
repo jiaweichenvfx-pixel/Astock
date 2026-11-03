@@ -1117,3 +1117,48 @@ def get_earnings_forecast(codes: list[str]) -> dict[str, dict]:
         if row:
             out[str(c)] = {k: v for k, v in row.items() if k != "_rank"}
     return out
+
+
+# ── 市场活跃度 & 行业资金流 ──────────────────────────────────────
+def get_market_activity(max_age: int = 300) -> dict:
+    """涨跌停/活跃度（乐咕口径，剔除 ST 有单独字段）。"""
+    cached = _cache_get("mkt_activity", max_age)
+    if cached:
+        return cached
+    out: dict = {}
+    try:
+        df = _ak_call(ak.stock_market_activity_legu)
+        for _, r in df.iterrows():
+            k = str(r.get("item", "")).strip()
+            v = r.get("value")
+            if k:
+                out[k] = v
+    except Exception:
+        return {}
+    if out:
+        _cache_set("mkt_activity", out)
+    return out
+
+
+def get_industry_fund_flow(max_age: int = 300) -> list[dict]:
+    """行业资金流（同花顺口径）：涨跌幅 + 净额（亿）+ 领涨股。"""
+    cached = _cache_get("industry_flow", max_age)
+    if cached and "rows" in cached:
+        return cached["rows"]
+    rows: list[dict] = []
+    try:
+        df = _ak_call(ak.stock_fund_flow_industry, symbol="即时")
+        for _, r in df.iterrows():
+            rows.append({
+                "name": str(r.get("行业", "")).strip(),
+                "pct": _to_float(r.get("行业-涨跌幅")),
+                "net": _to_float(r.get("净额")),          # 亿元
+                "count": _to_float(r.get("公司家数")),
+                "leader": str(r.get("领涨股", "")).strip(),
+                "leader_pct": _to_float(r.get("领涨股-涨跌幅")),
+            })
+    except Exception:
+        return rows
+    if rows:
+        _cache_set("industry_flow", {"rows": rows})
+    return rows

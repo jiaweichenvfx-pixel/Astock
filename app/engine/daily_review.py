@@ -60,7 +60,8 @@ def _avg(vals: list[float]) -> Optional[float]:
 
 
 def build(sectors: list[dict], indices: list[dict], breadth: dict,
-          positions: list[dict]) -> dict:
+          positions: list[dict], activity: Optional[dict] = None,
+          fund_flow: Optional[list[dict]] = None) -> dict:
     """sectors: [{name, pct}]；indices: [{name, pct}]；positions: [{name, code, pct, mv, pnl_ratio}]"""
     old = [s["pct"] for s in sectors if s.get("name") in OLD_MONEY and s.get("pct") is not None]
     tech = [s["pct"] for s in sectors if s.get("name") in TECH and s.get("pct") is not None]
@@ -79,6 +80,28 @@ def build(sectors: list[dict], indices: list[dict], breadth: dict,
     ranked = sorted([s for s in sectors if s.get("pct") is not None], key=lambda x: -x["pct"])
     top = ranked[:5]
     bottom = ranked[-5:][::-1]
+
+    # 行业资金净流入 / 流出
+    flows = [f for f in (fund_flow or []) if f.get("net") is not None]
+    inflow = sorted(flows, key=lambda x: -x["net"])[:5]
+    outflow = sorted(flows, key=lambda x: x["net"])[:5]
+
+    # 涨跌温度：真实涨停/跌停优先（剔除 ST）
+    act = activity or {}
+    def _num(k):
+        v = act.get(k)
+        try:
+            return int(float(str(v).rstrip("%")))
+        except Exception:
+            return None
+    real_up, real_down = _num("真实涨停"), _num("真实跌停")
+    up_n, down_n = _num("上涨"), _num("下跌")
+    flat_n, halt_n = _num("平盘"), _num("停牌")
+    active_pct = act.get("活跃度")
+    try:
+        active_pct = float(str(active_pct).rstrip("%"))
+    except Exception:
+        active_pct = None
 
     up_sectors = sum(1 for s in ranked if s["pct"] > 0)
     limit_up, limit_down = breadth.get("limit_up") or 0, breadth.get("limit_down") or 0
@@ -115,6 +138,16 @@ def build(sectors: list[dict], indices: list[dict], breadth: dict,
         parts.append(f"你的持仓 {port_pct:+.2f}%，{verb}沪深300 {abs(vs_index or 0):.2f}pp。")
 
     return {
+        "breadth2": {
+            "up": up_n, "down": down_n, "flat": flat_n, "halt": halt_n,
+            "limit_up": _num("涨停"), "limit_down": _num("跌停"),
+            "real_limit_up": real_up, "real_limit_down": real_down,
+            "active_pct": active_pct,
+            "up_ratio": round(up_n / (up_n + down_n) * 100, 1)
+            if up_n is not None and down_n and (up_n + down_n) > 0 else None,
+        },
+        "fund_flow": {"inflow": inflow, "outflow": outflow,
+                      "total_net": round(sum(f["net"] for f in flows), 1) if flows else None},
         "style": {"label": style_label, "plain": style_plain,
                   "old_money_pct": round(old_avg, 2) if old_avg is not None else None,
                   "tech_pct": round(tech_avg, 2) if tech_avg is not None else None,

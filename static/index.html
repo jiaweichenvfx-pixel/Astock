@@ -472,10 +472,7 @@
 
     <!-- 右列：市场与选股 -->
     <div class="col">
-    <div class="card">
-            <h2>🌡️ 市场环境</h2>
-            <div id="marketPanel"></div>
-          </div>
+    
     <div class="card">
             <h2>🎯 买点体检 <span class="tag">位置 + 趋势 + 基本面</span></h2>
             <div id="buypointPanel"><div class="loading"><span class="spinner"></span>计算中…</div></div>
@@ -710,24 +707,45 @@ async function loadDailyReview() {
     const r = await api('/api/daily-review');
     if (!r || !r.sectors) { el.style.display = 'none'; return; }
     el.style.display = 'block';
-    const st = r.style || {}, he = r.heat || {}, po = r.portfolio || {};
+
+    const st = r.style || {}, he = r.heat || {}, po = r.portfolio || {}, b2 = r.breadth2 || {}, ff = r.fund_flow || {};
     const c = STYLE_COLOR[st.label] || 'var(--muted)';
-    const secRows = (list, icon) => (list || []).map(x =>
-      `<div style="display:flex;justify-content:space-between;font-size:11.5px;padding:1px 0;">
-        <span>${icon} ${esc(x.name)}</span>
-        <span style="color:${x.pct >= 0 ? 'var(--green)' : 'var(--red)'};font-weight:700;">${x.pct > 0 ? '+' : ''}${x.pct.toFixed(1)}%</span>
-      </div>`).join('');
-    const posRows = (po.rows || []).slice(0, 4).map(x =>
-      `<div style="display:flex;justify-content:space-between;font-size:11.5px;padding:1px 0;">
-        <span>${esc(x.name)} <span class="dim" style="font-size:10px">${esc(x.sector || '')}</span></span>
-        <span style="color:${x.pct >= 0 ? 'var(--green)' : 'var(--red)'};font-weight:700;">${x.pct > 0 ? '+' : ''}${x.pct}%</span>
-      </div>`).join('');
+    const cl = v => v >= 0 ? 'var(--green)' : 'var(--red)';
+    const sg = v => (v > 0 ? '+' : '') + (v == null ? '—' : v);
+
     const idxRows = (r.indices || []).map(i =>
-      `<span style="font-size:11px;margin-right:10px;color:${i.pct >= 0 ? 'var(--green)' : 'var(--red)'};">
-        ${esc(i.name)} ${i.pct > 0 ? '+' : ''}${i.pct.toFixed(2)}%</span>`).join('');
+      `<span style="font-size:11.5px;margin-right:14px;color:${cl(i.pct)};font-weight:700;">
+        ${esc(i.name)} ${sg(i.pct.toFixed(2))}%</span>`).join('');
+
+    const tempChips = [
+      ['上涨', b2.up, 'var(--green)'], ['下跌', b2.down, 'var(--red)'],
+      ['涨停', b2.real_limit_up != null ? b2.real_limit_up : b2.limit_up, 'var(--red)'],
+      ['跌停', b2.real_limit_down != null ? b2.real_limit_down : b2.limit_down, 'var(--green)'],
+      ['上涨占比', b2.up_ratio != null ? b2.up_ratio + '%' : '—', ''],
+      ['活跃度', b2.active_pct != null ? b2.active_pct + '%' : '—', ''],
+      ['全市场净额', ff.total_net != null ? sg(ff.total_net) + '亿' : '—', ff.total_net >= 0 ? 'var(--green)' : 'var(--red)'],
+    ].map(([k, v, col]) =>
+      `<span style="font-size:11.5px;margin-right:16px;"><span class="dim">${k}</span>
+        <b style="color:${col || 'var(--text)'};">${v == null ? '—' : v}</b></span>`).join('');
+
+    const secRows = (list, icon) => (list || []).map(x =>
+      `<div style="display:flex;justify-content:space-between;font-size:11.5px;padding:1.5px 0;">
+        <span>${icon} ${esc(x.name)}</span>
+        <span style="color:${cl(x.pct)};font-weight:700;">${sg(x.pct.toFixed(1))}%</span></div>`).join('');
+
+    const flowRows = (list) => (list || []).map(x =>
+      `<div style="display:flex;justify-content:space-between;font-size:11.5px;padding:1.5px 0;">
+        <span>${esc(x.name)} <span class="dim" style="font-size:10px;">${esc(x.leader || '')}</span></span>
+        <span style="color:${cl(x.net)};font-weight:700;">${sg(x.net)}亿</span></div>`).join('');
+
+    const posRows = (po.rows || []).slice(0, 5).map(x =>
+      `<div style="display:flex;justify-content:space-between;font-size:11.5px;padding:1.5px 0;">
+        <span>${esc(x.name)} <span class="dim" style="font-size:10px;">${esc(x.sector || '')}</span></span>
+        <span style="color:${cl(x.pct)};font-weight:700;">${sg(x.pct)}%</span></div>`).join('');
+
     let histHtml = '';
     try {
-      const h = await api('/api/daily-review/history?days=12');
+      const h = await api('/api/daily-review/history?days=15');
       if (h.rows && h.rows.length > 1) {
         histHtml = `<details style="margin-top:10px;"><summary style="cursor:pointer;font-size:11px;color:var(--muted);list-style:none;">
           ▸ 历史复盘（${h.rows.length} 天）</summary>
@@ -735,38 +753,38 @@ async function loadDailyReview() {
             <div style="display:flex;gap:8px;font-size:11px;padding:2px 0;border-bottom:1px dashed #1c2739;">
               <span class="dim" style="min-width:78px;">${esc(x.date)}</span>
               <span style="min-width:34px;color:${x.style === '防守' ? 'var(--green)' : x.style === '进攻' ? 'var(--red)' : 'var(--muted)'};">${esc(x.style || '')}</span>
-              <span style="min-width:58px;color:${(x.portfolio_pct || 0) >= 0 ? 'var(--green)' : 'var(--red)'};">${x.portfolio_pct == null ? '—' : (x.portfolio_pct > 0 ? '+' : '') + x.portfolio_pct + '%'}</span>
-              <span style="min-width:56px;color:var(--muted);">${x.vs_index == null ? '—' : (x.vs_index > 0 ? '赢' : '输') + Math.abs(x.vs_index) + 'pp'}</span>
+              <span style="min-width:56px;color:${(x.portfolio_pct || 0) >= 0 ? 'var(--green)' : 'var(--red)'};">${x.portfolio_pct == null ? '—' : sg(x.portfolio_pct) + '%'}</span>
+              <span style="min-width:58px;color:var(--muted);">${x.vs_index == null ? '—' : (x.vs_index > 0 ? '赢' : '输') + Math.abs(x.vs_index) + 'pp'}</span>
               <span class="dim" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc((x.summary || '').slice(0, 46))}</span>
             </div>`).join('')}</div></details>`;
       }
     } catch (e) { /* 历史失败不影响主卡 */ }
+
     el.innerHTML = `
+      <h2 style="margin-bottom:6px;">📊 市场分析 <span class="tag">${esc(r.date || '')}</span></h2>
       <div class="review-head">
         <span class="review-tag" style="background:${c}22;color:${c};">${esc(st.label || '')}型市场</span>
-        ${esc((r.style || {}).plain || '')}
+        ${esc(st.plain || '')}
       </div>
       <div class="review-line">${esc(r.summary || '')}</div>
-      <div style="margin-top:8px;">${idxRows}</div>
-      <div class="review-grid">
-        <div class="review-box">
-          <div class="t">强势板块（${(r.sectors || {}).up_count || 0}/${(r.sectors || {}).total || 0} 个上涨）</div>
-          ${secRows((r.sectors || {}).top, '🟢')}
-        </div>
-        <div class="review-box">
-          <div class="t">弱势板块</div>
-          ${secRows((r.sectors || {}).bottom, '🔴')}
-        </div>
-        <div class="review-box">
-          <div class="t">我的持仓 ${po.pct > 0 ? '+' : ''}${po.pct == null ? '—' : po.pct}%
-            · ${po.vs_index > 0 ? '跑赢' : '跑输'} ${Math.abs(po.vs_index || 0).toFixed(2)}pp</div>
+      <div style="margin-top:8px;padding:8px 11px;border-radius:10px;background:rgba(255,255,255,.025);">${idxRows}</div>
+      <div style="margin-top:8px;padding:8px 11px;border-radius:10px;background:rgba(255,255,255,.025);">
+        <div class="t" style="font-size:10.5px;color:var(--muted);margin-bottom:4px;">市场温度</div>
+        ${tempChips}
+      </div>
+      <div class="review-grid" style="grid-template-columns:repeat(4,1fr);">
+        <div class="review-box"><div class="t">强势板块（${(r.sectors || {}).up_count || 0}/${(r.sectors || {}).total || 0} 上涨）</div>
+          ${secRows((r.sectors || {}).top, '🟢')}</div>
+        <div class="review-box"><div class="t">弱势板块</div>${secRows((r.sectors || {}).bottom, '🔴')}</div>
+        <div class="review-box"><div class="t">资金净流入（亿）</div>${flowRows(ff.inflow)}
+          <div class="t" style="margin-top:6px;">资金净流出</div>${flowRows(ff.outflow)}</div>
+        <div class="review-box"><div class="t">我的持仓 ${po.pct > 0 ? '+' : ''}${po.pct == null ? '—' : po.pct}%
+          · ${po.vs_index > 0 ? '跑赢' : '跑输'} ${Math.abs(po.vs_index || 0).toFixed(2)}pp</div>
           ${posRows}
-          <div class="dim" style="font-size:10px;margin-top:4px;">
-            上涨 ${po.up || 0}/${po.total || 0} · 涨停 ${he.limit_up || 0} · 跌停 ${he.limit_down || 0}
-            · 热度 ${esc(he.level || '')} · 次新 ${he.new_listing_pct == null ? '—' : he.new_listing_pct + '%'}
-          </div>
+          <div class="dim" style="font-size:10px;margin-top:5px;">上涨 ${po.up || 0}/${po.total || 0} · 热度 ${esc(he.level || '')} · 次新 ${he.new_listing_pct == null ? '—' : he.new_listing_pct + '%'}</div>
         </div>
-      </div>`;
+      </div>
+      ${histHtml}`;
   } catch (e) {
     el.style.display = 'none';
   }
@@ -2019,9 +2037,11 @@ function renderSummary() {
 }
 
 function renderMarket() {
+  const panel = document.getElementById('marketPanel');
+  if (!panel) return;      // 市场环境已并入「市场分析」卡
   const m = DATA.market_env;
   const icons = { hot:'🔥', mild:'🌤️', cold:'❄️' };
-  document.getElementById('marketPanel').innerHTML = `
+  panel.innerHTML = `
     <div class="temp"><div class="icon">${icons[m.temperature]||'🌡️'}</div>
       <div class="info"><div class="big">${m.temperature_label}</div><div class="dim">环境分 ${m.score}/10</div></div></div>
     ${[['涨跌家数比', m.adv_decl_ratio==null?'--':m.adv_decl_ratio],

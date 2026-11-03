@@ -633,7 +633,9 @@ def daily_review_view():
     positions = [{"code": p.code, "name": p.name, "pct": (quotes.get(p.code) or {}).get("pct_chg"),
                   "mv": p.market_value, "pnl_ratio": p.pnl_ratio} for p in acc.positions]
     data = daily_review.build(adapter.get_sector_spot(), mi.get("indices") or [],
-                              mi.get("breadth") or {}, positions)
+                              mi.get("breadth") or {}, positions,
+                              adapter.get_market_activity(),
+                              adapter.get_industry_fund_flow())
     data["date"] = mi.get("trade_date") or adapter.data_day()
     # 落库：收盘后才有意义的结论，同一交易日覆盖
     try:
