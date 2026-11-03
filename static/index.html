@@ -178,6 +178,16 @@
   .more-grid .card { background:rgba(255,255,255,.02); }
   @media (max-width:1150px) { .more-grid { grid-template-columns:1fr; } }
 
+  .review-card { margin-bottom:16px; background:linear-gradient(180deg, rgba(78,161,255,.06), rgba(20,22,30,.6)); }
+  .review-head { font-size:14px; font-weight:800; margin-bottom:6px; }
+  .review-line { font-size:12.5px; color:var(--muted); line-height:1.65; }
+  .review-grid { display:grid; grid-template-columns:repeat(3, 1fr); gap:12px; margin-top:10px; }
+  @media (max-width:1150px) { .review-grid { grid-template-columns:1fr; } }
+  .review-box { background:rgba(255,255,255,.025); border-radius:10px; padding:9px 11px; }
+  .review-box .t { font-size:10.5px; color:var(--muted); margin-bottom:5px; }
+  .review-tag { display:inline-block; padding:1px 7px; border-radius:6px; font-size:11px;
+    font-weight:700; margin-right:5px; }
+
   .action-card { margin-bottom:16px; border:1px solid rgba(255,93,104,.35);
     background:linear-gradient(180deg, rgba(255,93,104,.07), rgba(20,22,30,.6)); }
   .action-card .verdict { font-size:17px; font-weight:800; margin-bottom:4px; }
@@ -408,6 +418,8 @@
   <div class="banner" id="acctNote" style="display:none;background:linear-gradient(90deg, rgba(255,159,67,.26), rgba(255,159,67,.08));border-color:#5a3a15;color:#ffd9a8;"></div>
 
   <div id="actionCard" class="card action-card" style="display:none;"></div>
+
+  <div id="dailyReview" class="card review-card" style="display:none;"></div>
 
   <div class="grid">
     <!-- 左列：账户与风险 -->
@@ -688,6 +700,61 @@ const fmt = n => (n == null ? '--' : Number(n).toLocaleString('zh-CN', {maximumF
 const pct = n => (n == null ? '--' : (n > 0 ? '+' : '') + Number(n).toFixed(2) + '%');
 const colorFor = v => v > 0 ? 'c-red' : v < 0 ? 'c-green' : 'muted';
 function esc(s) { return (s == null ? '' : String(s)).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+/* ── 每日复盘 ── */
+const STYLE_COLOR = { 防守: 'var(--green)', 进攻: 'var(--red)', 均衡: 'var(--muted)', 未知: 'var(--muted)' };
+async function loadDailyReview() {
+  const el = document.getElementById('dailyReview');
+  if (!el) return;
+  try {
+    const r = await api('/api/daily-review');
+    if (!r || !r.sectors) { el.style.display = 'none'; return; }
+    el.style.display = 'block';
+    const st = r.style || {}, he = r.heat || {}, po = r.portfolio || {};
+    const c = STYLE_COLOR[st.label] || 'var(--muted)';
+    const secRows = (list, icon) => (list || []).map(x =>
+      `<div style="display:flex;justify-content:space-between;font-size:11.5px;padding:1px 0;">
+        <span>${icon} ${esc(x.name)}</span>
+        <span style="color:${x.pct >= 0 ? 'var(--green)' : 'var(--red)'};font-weight:700;">${x.pct > 0 ? '+' : ''}${x.pct.toFixed(1)}%</span>
+      </div>`).join('');
+    const posRows = (po.rows || []).slice(0, 4).map(x =>
+      `<div style="display:flex;justify-content:space-between;font-size:11.5px;padding:1px 0;">
+        <span>${esc(x.name)} <span class="dim" style="font-size:10px">${esc(x.sector || '')}</span></span>
+        <span style="color:${x.pct >= 0 ? 'var(--green)' : 'var(--red)'};font-weight:700;">${x.pct > 0 ? '+' : ''}${x.pct}%</span>
+      </div>`).join('');
+    const idxRows = (r.indices || []).map(i =>
+      `<span style="font-size:11px;margin-right:10px;color:${i.pct >= 0 ? 'var(--green)' : 'var(--red)'};">
+        ${esc(i.name)} ${i.pct > 0 ? '+' : ''}${i.pct.toFixed(2)}%</span>`).join('');
+    el.innerHTML = `
+      <div class="review-head">
+        <span class="review-tag" style="background:${c}22;color:${c};">${esc(st.label || '')}型市场</span>
+        ${esc((r.style || {}).plain || '')}
+      </div>
+      <div class="review-line">${esc(r.summary || '')}</div>
+      <div style="margin-top:8px;">${idxRows}</div>
+      <div class="review-grid">
+        <div class="review-box">
+          <div class="t">强势板块（${(r.sectors || {}).up_count || 0}/${(r.sectors || {}).total || 0} 个上涨）</div>
+          ${secRows((r.sectors || {}).top, '🟢')}
+        </div>
+        <div class="review-box">
+          <div class="t">弱势板块</div>
+          ${secRows((r.sectors || {}).bottom, '🔴')}
+        </div>
+        <div class="review-box">
+          <div class="t">我的持仓 ${po.pct > 0 ? '+' : ''}${po.pct == null ? '—' : po.pct}%
+            · ${po.vs_index > 0 ? '跑赢' : '跑输'} ${Math.abs(po.vs_index || 0).toFixed(2)}pp</div>
+          ${posRows}
+          <div class="dim" style="font-size:10px;margin-top:4px;">
+            上涨 ${po.up || 0}/${po.total || 0} · 涨停 ${he.limit_up || 0} · 跌停 ${he.limit_down || 0}
+            · 热度 ${esc(he.level || '')} · 次新 ${he.new_listing_pct == null ? '—' : he.new_listing_pct + '%'}
+          </div>
+        </div>
+      </div>`;
+  } catch (e) {
+    el.style.display = 'none';
+  }
+}
 
 /* ── 盈利保护 ── */
 const PG_STYLE = {
@@ -1684,7 +1751,7 @@ function render() {
   renderHeader(); renderHealth(); renderAssets(); renderGate(); renderPositions();
   renderSell(); renderBuy(); renderDeleverage(); renderSwap(); renderSummary();
   renderMarket(); renderMacro(); renderSectors(); renderPools();
-  renderStrategy(); loadTodo(); loadSignals(); loadEquity(); loadPortfolioBt(); loadWatchpool(); loadFactor(); loadRescue(); loadJwatch(); loadFundamental(); loadBuypoint(); loadFinancing(); loadActionCard(); loadProfitGuard();
+  renderStrategy(); loadTodo(); loadSignals(); loadEquity(); loadPortfolioBt(); loadWatchpool(); loadFactor(); loadRescue(); loadJwatch(); loadFundamental(); loadBuypoint(); loadFinancing(); loadActionCard(); loadProfitGuard(); loadDailyReview();
 }
 
 /* 底部一句话策略：把「模式 + 卖点 + 仓位 + 市场温度」压成一句能直接照做的话 */

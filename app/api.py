@@ -618,6 +618,24 @@ def portfolio_bt_view(force: bool = False, date: Optional[str] = None):
 
 
 # ── 今日待办 / 信号复盘 ────────────────────────────────────────
+@router.get("/api/daily-review")
+def daily_review_view():
+    """每日复盘：什么市场、哪些板块在涨、我的持仓怎么样。"""
+    from .engine import daily_review, market_info
+
+    acc = storage.load_account()
+    quotes = adapter.get_quotes([p.code for p in acc.positions])
+    try:
+        pipeline.enrich_account(acc, quotes)
+    except Exception:
+        pass
+    mi = market_info.build_market_info()
+    positions = [{"code": p.code, "name": p.name, "pct": (quotes.get(p.code) or {}).get("pct_chg"),
+                  "mv": p.market_value, "pnl_ratio": p.pnl_ratio} for p in acc.positions]
+    return daily_review.build(adapter.get_sector_spot(), mi.get("indices") or [],
+                              mi.get("breadth") or {}, positions)
+
+
 @router.get("/api/profit-guard")
 def profit_guard_view():
     """盈利保护：浮盈超过 10% 的持仓，盯超买信号锁利润。"""
