@@ -68,6 +68,12 @@ CREATE TABLE IF NOT EXISTS bt_cache (
     PRIMARY KEY (date, code, horizon)
 );
 CREATE INDEX IF NOT EXISTS idx_bt_date ON bt_cache(date);
+CREATE TABLE IF NOT EXISTS daily_reviews (
+    date TEXT PRIMARY KEY,
+    style_label TEXT, spread REAL, portfolio_pct REAL, vs_index REAL,
+    heat_level TEXT, summary TEXT, payload TEXT, created_at REAL
+);
+
 CREATE TABLE IF NOT EXISTS equity_snapshots (
     date TEXT PRIMARY KEY,
     total_assets REAL, net_assets REAL, position_value REAL, cash REAL,
@@ -158,6 +164,35 @@ def clear_signals() -> None:
 
 
 # ── 账户每日快照 ─────────────────────────────────────────────────
+def save_daily_review(date: str, data: dict) -> None:
+    """存一天的复盘结论（同一天覆盖）。"""
+    import json as _json
+    st = data.get("style") or {}
+    po = data.get("portfolio") or {}
+    with _WRITE_LOCK, _conn() as conn:
+        conn.execute(
+            "INSERT OR REPLACE INTO daily_reviews"
+            "(date, style_label, spread, portfolio_pct, vs_index, heat_level, summary, payload, created_at)"
+            " VALUES(?,?,?,?,?,?,?,?,?)",
+            (date, st.get("label"), st.get("spread"), po.get("pct"), po.get("vs_index"),
+             (data.get("heat") or {}).get("level"), data.get("summary") or "",
+             _json.dumps(data, ensure_ascii=False), time.time()),
+        )
+        conn.commit()
+
+
+def list_daily_reviews(limit: int = 30) -> list[dict]:
+    """最近的复盘记录（按日期倒序）。"""
+    import json as _json
+    with _conn() as conn:
+        rows = conn.execute(
+            "SELECT date, style_label, spread, portfolio_pct, vs_index, heat_level, summary"
+            " FROM daily_reviews ORDER BY date DESC LIMIT ?", (limit,)
+        ).fetchall()
+    return [{"date": r[0], "style": r[1], "spread": r[2], "portfolio_pct": r[3],
+             "vs_index": r[4], "heat": r[5], "summary": r[6]} for r in rows]
+
+
 def save_equity_snapshot(date: str, row: dict) -> None:
     with _WRITE_LOCK, _conn() as conn:
         conn.execute(

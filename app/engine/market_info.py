@@ -69,7 +69,8 @@ def build_market_info(now: Optional[datetime] = None) -> dict:
         "session_label": session_label,
         "is_trading_day": trading_day,
         "earnings_season": adapter.in_earnings_season(now),
-        "trade_date": adapter.latest_trade_day(now.date()),
+        # 用 data_day 而不是 latest_trade_day：开盘前当天还没有数据，应算作上一交易日
+        "trade_date": adapter.data_day(now),
         "as_of": now.strftime("%Y-%m-%d %H:%M"),
         "indices": indices,
         "breadth": {

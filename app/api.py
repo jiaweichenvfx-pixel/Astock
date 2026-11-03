@@ -10,7 +10,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 from . import pipeline, storage
-from .data import adapter
+from .data import adapter, db
 from .schemas import Position
 
 router = APIRouter()
@@ -632,8 +632,21 @@ def daily_review_view():
     mi = market_info.build_market_info()
     positions = [{"code": p.code, "name": p.name, "pct": (quotes.get(p.code) or {}).get("pct_chg"),
                   "mv": p.market_value, "pnl_ratio": p.pnl_ratio} for p in acc.positions]
-    return daily_review.build(adapter.get_sector_spot(), mi.get("indices") or [],
+    data = daily_review.build(adapter.get_sector_spot(), mi.get("indices") or [],
                               mi.get("breadth") or {}, positions)
+    data["date"] = mi.get("trade_date") or adapter.data_day()
+    # 落库：收盘后才有意义的结论，同一交易日覆盖
+    try:
+        db.save_daily_review(data["date"], data)
+    except Exception:
+        pass
+    return data
+
+
+@router.get("/api/daily-review/history")
+def daily_review_history(days: int = 30):
+    """历史复盘：每天一句结论 + 风格 + 持仓表现。"""
+    return {"rows": db.list_daily_reviews(max(1, min(days, 365)))}
 
 
 @router.get("/api/profit-guard")

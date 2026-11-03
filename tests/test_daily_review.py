@@ -29,3 +29,21 @@ def test_heat_level():
     assert daily_review._heat_level(90, 5, 5) == "过热"
     assert daily_review._heat_level(63, 25, -5.9) == "偏冷"
     assert daily_review._heat_level(30, 20, 1) in ("中性", "偏热")
+
+
+# 历史复盘落库
+def test_daily_review_persist(tmp_path, monkeypatch):
+    from app.data import db
+
+    data = {"style": {"label": "防守", "spread": 2.65},
+            "portfolio": {"pct": 1.04, "vs_index": 1.24},
+            "heat": {"level": "偏冷"}, "summary": "今天是防守型市场"}
+    db.save_daily_review("2099-01-01", data)
+    rows = db.list_daily_reviews(5)
+    hit = [r for r in rows if r["date"] == "2099-01-01"]
+    assert hit and hit[0]["style"] == "防守"
+    assert hit[0]["vs_index"] == 1.24
+    # 同日覆盖
+    db.save_daily_review("2099-01-01", {**data, "summary": "覆盖后"})
+    rows = [r for r in db.list_daily_reviews(5) if r["date"] == "2099-01-01"]
+    assert len(rows) == 1 and rows[0]["summary"] == "覆盖后"

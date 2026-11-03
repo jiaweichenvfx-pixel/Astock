@@ -725,6 +725,22 @@ async function loadDailyReview() {
     const idxRows = (r.indices || []).map(i =>
       `<span style="font-size:11px;margin-right:10px;color:${i.pct >= 0 ? 'var(--green)' : 'var(--red)'};">
         ${esc(i.name)} ${i.pct > 0 ? '+' : ''}${i.pct.toFixed(2)}%</span>`).join('');
+    let histHtml = '';
+    try {
+      const h = await api('/api/daily-review/history?days=12');
+      if (h.rows && h.rows.length > 1) {
+        histHtml = `<details style="margin-top:10px;"><summary style="cursor:pointer;font-size:11px;color:var(--muted);list-style:none;">
+          ▸ 历史复盘（${h.rows.length} 天）</summary>
+          <div style="margin-top:6px;">${h.rows.map(x => `
+            <div style="display:flex;gap:8px;font-size:11px;padding:2px 0;border-bottom:1px dashed #1c2739;">
+              <span class="dim" style="min-width:78px;">${esc(x.date)}</span>
+              <span style="min-width:34px;color:${x.style === '防守' ? 'var(--green)' : x.style === '进攻' ? 'var(--red)' : 'var(--muted)'};">${esc(x.style || '')}</span>
+              <span style="min-width:58px;color:${(x.portfolio_pct || 0) >= 0 ? 'var(--green)' : 'var(--red)'};">${x.portfolio_pct == null ? '—' : (x.portfolio_pct > 0 ? '+' : '') + x.portfolio_pct + '%'}</span>
+              <span style="min-width:56px;color:var(--muted);">${x.vs_index == null ? '—' : (x.vs_index > 0 ? '赢' : '输') + Math.abs(x.vs_index) + 'pp'}</span>
+              <span class="dim" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc((x.summary || '').slice(0, 46))}</span>
+            </div>`).join('')}</div></details>`;
+      }
+    } catch (e) { /* 历史失败不影响主卡 */ }
     el.innerHTML = `
       <div class="review-head">
         <span class="review-tag" style="background:${c}22;color:${c};">${esc(st.label || '')}型市场</span>
