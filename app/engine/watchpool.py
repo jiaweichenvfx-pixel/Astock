@@ -68,6 +68,17 @@ def remove(pool: str, code: str, exit_date: str, exit_price: float, exit_reason:
     })
 
 
+def _long_cap_ok(code: str) -> bool:
+    """长线池只留大票：市值 ≥300 亿。"""
+    try:
+        from .factor import MIN_LONG_CAP
+        spot = adapter.get_spot_snapshot_cached(3600) or {}
+        cap = (spot.get(code) or {}).get("market_cap") or 0
+        return cap >= MIN_LONG_CAP if cap else True   # 拿不到市值时先不踢
+    except Exception:
+        return True
+
+
 def _review(pool: str, code: str) -> Optional[tuple[float, str]]:
     """趋势是否走坏。返回 (剔除价, 原因)，None 表示仍健康。"""
     bars = adapter.get_stock_history(code, days=HIST_DAYS[pool])
@@ -140,6 +151,11 @@ def daily_update(screener: dict, today: Optional[str] = None,
     for pool in POOLS:
         for m in list_members(pool, "active"):
             if (m.get("entry_date") or "") >= today:
+                continue
+            if pool == "long" and not _long_cap_ok(m["code"]):
+                remove(pool, m["code"], today, m["entry_price"] or 0,
+                       "市值不达标（长线只留 ≥300 亿的大票）")
+                removed.append((pool, m["code"]))
                 continue
             res = _review(pool, m["code"])
             if res:

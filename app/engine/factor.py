@@ -57,9 +57,19 @@ def _universe_trend(spot: dict) -> list[dict]:
     return rows[:120]
 
 
-def _universe_large(spot: dict) -> list[dict]:
-    """长线池：大市值龙头。市值优先，缺失则用成交额。"""
+MIN_LONG_CAP = 3e10      # 长线池市值下限 300 亿
+
+
+def _universe_large(spot: dict, min_cap: float = MIN_LONG_CAP) -> list[dict]:
+    """长线池：大市值龙头（市值 ≥300 亿，按市值降序）。
+
+    不能用「市值缺失就退回成交额」——那样会悄悄选进小盘题材股
+    （曾经因此把 90 亿的海洋王、101 亿的莱美药业选进长线池）。
+    市值数据整体缺失时，改用成交额 ≥5 亿兜底，仍然是流动性最好的那批。
+    """
     rows = []
+    has_cap = sum(1 for r in spot.values() if (r.get("market_cap") or 0) > 0)
+    use_cap = has_cap > len(spot) * 0.3
     for code, r in spot.items():
         name = r.get("name") or ""
         if "ST" in name.upper() or "退" in name:
@@ -68,8 +78,13 @@ def _universe_large(spot: dict) -> list[dict]:
             continue
         if (r.get("price") or 0) < 3:
             continue
+        cap = r.get("market_cap") or 0.0
+        if use_cap and cap < min_cap:
+            continue
+        if not use_cap and (r.get("turnover") or 0) < 5e8:
+            continue
         rows.append({"code": code, "name": name,
-                     "turnover": r.get("turnover") or 0, "market_cap": r.get("market_cap") or 0.0})
+                     "turnover": r.get("turnover") or 0, "market_cap": cap})
     rows.sort(key=lambda x: (-x["market_cap"], -x["turnover"]))
     return rows[:120]
 

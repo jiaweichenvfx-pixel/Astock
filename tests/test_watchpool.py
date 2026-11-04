@@ -123,3 +123,30 @@ def test_up_market_allows_short_entries(monkeypatch):
                                regime={"regime": "up", "label": "上涨市"})
     assert "short" in {a[0] for a in r["added"]}
     assert r["market"]["paused_pools"] == []
+
+
+# ── 长线池只留大票 ──────────────────────────────────────────────
+def test_long_universe_requires_large_cap():
+    from app.engine import factor
+    spot = {
+        "600519": {"name": "贵州茅台", "price": 1500, "turnover": 5e9, "market_cap": 1.8e12},
+        "002724": {"name": "海洋王", "price": 12, "turnover": 1.3e9, "market_cap": 9e9},
+        "600825": {"name": "新华传媒", "price": 12, "turnover": 1.9e9, "market_cap": 1.27e10},
+    }
+    codes = {x["code"] for x in factor._universe_large(spot)}
+    assert "600519" in codes
+    assert "002724" not in codes and "600825" not in codes
+
+
+def test_long_screener_evicts_small_caps(monkeypatch):
+    from app.data import db
+    monkeypatch.setattr(watchpool.adapter, "get_stock_history",
+                        lambda code, days=0, period="daily": _bars([10.0 + i * 0.1 for i in range(40)]))
+    caps = {"600519": 1.8e12, "002724": 9e9}
+    monkeypatch.setattr(watchpool.adapter, "get_spot_snapshot_cached",
+                        lambda max_age=0: {"600519": {"name": "贵州茅台", "market_cap": caps["600519"]},
+                                           "002724": {"name": "海洋王", "market_cap": caps["002724"]}})
+    watchpool.add("long", "002724", "海洋王", "2026-10-01", 12.0, 80, "测试")
+    watchpool.daily_update(_screener(), today="2026-10-25",
+                           regime={"regime": "up", "label": "上涨市"})
+    assert not any(m["code"] == "002724" for m in db.list_pool_members("long", "active"))

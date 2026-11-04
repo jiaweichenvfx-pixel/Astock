@@ -169,6 +169,49 @@ def _fetch_sina_spot() -> Optional[dict[str, dict]]:
     return rows
 
 
+def refresh_market_cap_map() -> int:
+    """建立 code→总市值 映射并长期缓存（60 天），供新浪兜底时回填。
+
+    东财直连失败时会降级到新浪，而新浪快照没有市值字段。没有这份映射，
+    长线池就会退回按成交额排序、选进小盘股。
+    """
+    if not HAS_AKSHARE:
+        return 0
+    try:
+        df = _ak_call(ak.stock_zh_a_spot_em)
+        m = {}
+        for _, r in df.iterrows():
+            code = str(r.get("代码", "")).strip()
+            cap = _to_float(r.get("总市值"))
+            if code and cap and cap > 0:
+                m[code] = cap
+        if m:
+            _cache_set("mktcap_map", {"rows": m})
+        return len(m)
+    except Exception:
+        return 0
+
+
+def _merge_market_cap(rows: dict[str, dict]) -> dict[str, dict]:
+    """补全市值：新浪兜底数据没有市值字段，长期缓存一份映射用来回填。
+
+    没有这一步，东财一失败，长线池（按市值选）就会退回按成交额排序，
+    把小盘题材股选进"大票池"。
+    """
+    caps = (_cache_get("mktcap_map", 86400 * 60) or {}).get("rows") or {}
+    have = sum(1 for r in rows.values() if (r.get("market_cap") or 0) > 0)
+    if have > len(rows) * 0.3:
+        _cache_set("mktcap_map", {"rows": {c: r["market_cap"] for c, r in rows.items()
+                                           if (r.get("market_cap") or 0) > 0}})
+        return rows
+    filled = 0
+    for code, r in rows.items():
+        if not (r.get("market_cap") or 0) and code in caps:
+            r["market_cap"] = caps[code]
+            filled += 1
+    return rows
+
+
 def get_spot_snapshot(force: bool = False) -> Optional[dict]:
     """获取全市场实时快照：优先东方财富，失败降级新浪。缓存 120s。
 
@@ -204,6 +247,7 @@ def get_spot_snapshot(force: bool = False) -> Optional[dict]:
                 rows = None
 
         if rows:
+            rows = _merge_market_cap(rows)
             _cache_set("spot", {"rows": rows, "source": source})
             return rows
         return cached.get("rows") if cached else None
