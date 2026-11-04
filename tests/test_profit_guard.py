@@ -31,3 +31,21 @@ def test_state_weak_when_profit_erodes():
 
 def test_state_ok():
     assert profit_guard._state(15.0, rsi=50, j=50, divergence=False, dd=-3)[0] == "ok"
+
+
+def test_oversold_does_not_lock():
+    """RSI 超卖时不该喊锁利润——那是反弹起点，不是卖点。"""
+    st, why = profit_guard._state(23.2, rsi=27, j=6, divergence=False, dd=-31.66)
+    assert st == "weak"
+    assert "超卖" in why
+
+
+def test_drawdown_stop_skipped_when_oversold(monkeypatch):
+    from app.engine import sell
+    from app.schemas import Position
+    monkeypatch.setattr(sell.config, "get_exit_rules", lambda: {
+        "drawdown_stop": {"crash_pct": -30.0, "give_back_pct": -15.0, "profit_gate": 10.0}})
+    pos = Position(code="600489", name="中金黄金", shares=100, cost_price=16.53,
+                   current_price=20.36, rating=None)
+    assert sell.check_drawdown_stop(pos, -32.0, rsi=27) is None      # 超卖：不喊崩塌
+    assert sell.check_drawdown_stop(pos, -32.0, rsi=55) is not None  # 正常：该喊

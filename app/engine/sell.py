@@ -131,7 +131,8 @@ def check_profit_protection(pos: Position, rsi: Optional[float], j: Optional[flo
     return None
 
 
-def check_drawdown_stop(pos: Position, dd_60d: Optional[float]) -> Optional[_Candidate]:
+def check_drawdown_stop(pos: Position, dd_60d: Optional[float],
+                        rsi: Optional[float] = None) -> Optional[_Candidate]:
     """回撤止损（跟踪止损）：从 60 日最高价回撤过大就减。
 
     成本锚定的止损在深套账户上完全失效（成本线离现价太远，永远不触发），
@@ -149,6 +150,9 @@ def check_drawdown_stop(pos: Position, dd_60d: Optional[float]) -> Optional[_Can
 
     cur = pos.current_price if pos.current_price is not None else pos.cost_price
     if dd_60d <= crash:
+        # 超卖区不喊"趋势崩塌"：那是反弹起点，不是卖点
+        if rsi is not None and rsi < 35:
+            return None
         return _Candidate(
             SellMechanism.TECHNICAL, 68,
             f"从 60 日最高价回撤 {abs(dd_60d):.0f}%，趋势崩塌",
@@ -310,7 +314,7 @@ def scan_positions(
         if c:
             candidates.append(c)
 
-        c = check_drawdown_stop(pos, f.get("dd_60d"))
+        c = check_drawdown_stop(pos, f.get("dd_60d"), f.get("rsi"))
         if c:
             candidates.append(c)
 

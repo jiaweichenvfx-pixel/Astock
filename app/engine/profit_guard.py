@@ -28,6 +28,10 @@ def _state(pnl: float, rsi: Optional[float], j: Optional[float],
     if overbought:
         return "near", "已超买，但浮盈还不够厚，先观察"
     if dd is not None and dd <= -15 and pnl >= PROTECT_PNL:
+        # 超卖（RSI<40）时不要喊"锁利润"：股价正在反弹，这时候卖往往是卖在低点
+        if rsi is not None and rsi < 40:
+            return "weak", (f"从高点回撤 {abs(dd):.0f}%，但 RSI {rsi:.0f} 已超卖，"
+                            f"等反弹到趋势线附近再处理")
         return "lock", f"从高点回撤 {abs(dd):.0f}%，锁住剩余利润"
     if dd is not None and dd <= -25:
         return "weak", f"已从高点回撤 {abs(dd):.0f}%，利润在缩水，趋势转弱"
