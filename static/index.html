@@ -448,6 +448,10 @@
                 <h2>📈 资产与杠杆 <span class="tag">净值 / 回撤</span></h2>
                 <div id="equityPanel"><div class="dim" style="font-size:12px;">加载中…</div></div>
               </div>
+    <div class="card">
+                <h2>📒 信号账本 <span class="tag">照做会怎样</span></h2>
+                <div id="ledgerPanel"><div class="loading"><span class="spinner"></span>统计中…</div></div>
+              </div>
     </div>
 
     <!-- 中列：今天做什么 -->
@@ -481,10 +485,7 @@
             <h2>📊 基本面趋势 <span class="tag">连续几期在恶化</span></h2>
             <div id="fundPanel"><div class="loading"><span class="spinner"></span>读取财报（首次较慢）…</div></div>
           </div>
-    <div class="card">
-            <h2>📒 信号账本 <span class="tag">照做会怎样</span></h2>
-            <div id="ledgerPanel"><div class="loading"><span class="spinner"></span>统计中…</div></div>
-          </div>
+    
         <div class="card">
             <h2>🛡️ 盈利保护 <span class="tag">浮盈 10% 起监控</span></h2>
             <div id="profitGuardPanel"><div class="loading"><span class="spinner"></span>扫描中…</div></div>
@@ -732,17 +733,17 @@ async function loadDailyReview() {
       `<span style="font-size:11.5px;margin-right:16px;"><span class="dim">${k}</span>
         <b style="color:${col || 'var(--text)'};">${v == null ? '—' : v}</b></span>`).join('');
 
-    const secRows = (list, icon) => (list || []).map(x =>
+    const secRows = (list, icon) => (list || []).slice(0, 4).map(x =>
       `<div style="display:flex;justify-content:space-between;font-size:11.5px;padding:1.5px 0;">
         <span>${icon} ${esc(x.name)}</span>
         <span style="color:${cl(x.pct)};font-weight:700;">${sg(x.pct.toFixed(1))}%</span></div>`).join('');
 
-    const flowRows = (list) => (list || []).map(x =>
+    const flowRows = (list) => (list || []).slice(0, 4).map(x =>
       `<div style="display:flex;justify-content:space-between;font-size:11.5px;padding:1.5px 0;">
         <span>${esc(x.name)} <span class="dim" style="font-size:10px;">${esc(x.leader || '')}</span></span>
         <span style="color:${cl(x.net)};font-weight:700;">${sg(x.net)}亿</span></div>`).join('');
 
-    const posRows = (po.rows || []).slice(0, 5).map(x =>
+    const posRows = (po.rows || []).slice(0, 3).map(x =>
       `<div style="display:flex;justify-content:space-between;font-size:11.5px;padding:1.5px 0;">
         <span>${esc(x.name)} <span class="dim" style="font-size:10px;">${esc(x.sector || '')}</span></span>
         <span style="color:${cl(x.pct)};font-weight:700;">${sg(x.pct)}%</span></div>`).join('');
@@ -1451,8 +1452,14 @@ async function loadWatchpool() {
           <span class="dim" style="font-size:10px">${(m.entry_date || '').slice(5)} 入 · 分${m.entry_score}</span></span>
           <span class="v ${rc}">${ret == null ? '--' : (ret > 0 ? '+' : '') + ret + '%'}</span></div>`;
       }).join('');
+      const sg = (r.strategies || {})[pkey] || {};
+      const sgTxt = sg.label
+        ? `<span class="dim" style="font-weight:400;font-size:10.5px;">· ${esc(sg.label)}`
+          + (sg.avg_return != null ? ` ${sg.avg_return > 0 ? '+' : ''}${sg.avg_return}%` : '')
+          + (sg.win_rate != null ? `/${sg.win_rate}%胜` : '') + '</span>'
+        : '';
       return `<div style="font-weight:700;margin:8px 0 4px;color:${colors[pkey]}">${esc(label[pkey] || pkey)}
-        <span class="dim" style="font-weight:400;font-size:11px">${ms.length} 只</span></div>
+        <span class="dim" style="font-weight:400;font-size:11px">${ms.length} 只</span> ${sgTxt}</div>
         ${rows || '<div class="dim" style="font-size:11.5px;padding:2px 0">暂无，运行一次选股后填充</div>'}`;
     };
     el.innerHTML = sec('short') + sec('mid') + sec('long');

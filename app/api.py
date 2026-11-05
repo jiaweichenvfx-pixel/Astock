@@ -438,8 +438,27 @@ def watchpool_view():
     except Exception:
         regime = {"regime": "neutral", "label": "震荡市"}
 
+    # 每个池当前用的策略 + 该策略近期表现
+    strategies = {}
+    try:
+        from .engine import factor as _f
+        for pool in watchpool.POOLS:
+            key = _f.best_strategy(pool)
+            cached = adapter._cache_get(f"factor2_{pool}_{adapter.data_day()}", 86400 * 20) or {}
+            rows_rank = (cached.get("rows") or {}).get("strategies") or []
+            hit = next((r for r in rows_rank if r.get("strategy") == key), None)
+            strategies[pool] = {
+                "key": key,
+                "label": (hit or {}).get("label") or key,
+                "avg_return": (hit or {}).get("avg_return"),
+                "win_rate": (hit or {}).get("win_rate"),
+            }
+    except Exception:
+        strategies = {}
+
     return {
         "labels": watchpool.POOL_LABEL,
+        "strategies": strategies,
         "market": {"regime": regime.get("regime"), "label": regime.get("label"),
                    "paused_pools": ["short"] if regime.get("regime") == "down" else []},
         "pools": members,
