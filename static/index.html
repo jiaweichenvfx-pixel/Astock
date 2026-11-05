@@ -188,6 +188,15 @@
   .review-tag { display:inline-block; padding:1px 7px; border-radius:6px; font-size:11px;
     font-weight:700; margin-right:5px; }
 
+  .mkt-details > summary { cursor:pointer; list-style:none; display:flex;
+    align-items:baseline; gap:8px; flex-wrap:wrap; }
+  .mkt-details > summary::-webkit-details-marker { display:none; }
+  .mkt-details > summary::after { content:'▾ 详情'; margin-left:auto;
+    font-size:10.5px; color:var(--muted); font-weight:400; }
+  .mkt-details[open] > summary::after { content:'▴ 收起'; }
+  .mkt-details[open] > summary { margin-bottom:10px; padding-bottom:8px;
+    border-bottom:1px dashed var(--border); }
+
   .action-card { margin-bottom:16px; border:1px solid rgba(255,93,104,.35);
     background:linear-gradient(180deg, rgba(255,93,104,.07), rgba(20,22,30,.6)); }
   .action-card .verdict { font-size:17px; font-weight:800; margin-bottom:4px; }
@@ -765,12 +774,17 @@ async function loadDailyReview() {
       }
     } catch (e) { /* 历史失败不影响主卡 */ }
 
-    el.innerHTML = `
-      <h2 style="margin-bottom:6px;">📊 市场分析 <span class="tag">${esc(r.date || '')}</span></h2>
-      <div class="review-head">
-        <span class="review-tag" style="background:${c}22;color:${c};">${esc(st.label || '')}型市场</span>
-        ${esc(st.plain || '')}
-      </div>
+    el.innerHTML = `<details class="mkt-details">
+      <summary>
+        <span style="font-size:14px;font-weight:800;">📊 市场分析</span>
+        <span class="review-tag" style="background:${c}22;color:${c};">${esc(st.label || '')}</span>
+        <span style="font-size:12px;color:var(--muted);">
+          持仓 <b style="color:${cl(po.pct || 0)};">${sg(po.pct)}%</b>
+          ${po.vs_index > 0 ? '跑赢' : '跑输'} ${Math.abs(po.vs_index || 0).toFixed(2)}pp
+          · 热度 ${esc(he.level || '')}
+        </span>
+        <span class="dim" style="font-size:10.5px;width:100%;margin-top:2px;">${esc(st.plain || '')}</span>
+      </summary>
       <div class="review-line">${esc(r.summary || '')}</div>
       <div style="margin-top:8px;padding:8px 11px;border-radius:10px;background:rgba(255,255,255,.025);">${idxRows}</div>
       <div style="margin-top:8px;padding:8px 11px;border-radius:10px;background:rgba(255,255,255,.025);">
@@ -783,13 +797,12 @@ async function loadDailyReview() {
         <div class="review-box"><div class="t">弱势板块</div>${secRows((r.sectors || {}).bottom, '🔴')}</div>
         <div class="review-box"><div class="t">资金净流入（亿）</div>${flowRows(ff.inflow)}
           <div class="t" style="margin-top:6px;">资金净流出</div>${flowRows(ff.outflow)}</div>
-        <div class="review-box"><div class="t">我的持仓 ${po.pct > 0 ? '+' : ''}${po.pct == null ? '—' : po.pct}%
-          · ${po.vs_index > 0 ? '跑赢' : '跑输'} ${Math.abs(po.vs_index || 0).toFixed(2)}pp</div>
-          ${posRows}
-          <div class="dim" style="font-size:10px;margin-top:5px;">上涨 ${po.up || 0}/${po.total || 0} · 热度 ${esc(he.level || '')} · 次新 ${he.new_listing_pct == null ? '—' : he.new_listing_pct + '%'}</div>
+        <div class="review-box"><div class="t">我的持仓 ${sg(po.pct)}%</div>${posRows}
+          <div class="dim" style="font-size:10px;margin-top:5px;">上涨 ${po.up || 0}/${po.total || 0} · 次新 ${he.new_listing_pct == null ? '—' : he.new_listing_pct + '%'}</div>
         </div>
       </div>
-      ${histHtml}`;
+      ${histHtml}
+    </details>`;
   } catch (e) {
     el.style.display = 'none';
   }
