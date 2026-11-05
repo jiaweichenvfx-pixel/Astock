@@ -482,6 +482,10 @@
             <div id="fundPanel"><div class="loading"><span class="spinner"></span>读取财报（首次较慢）…</div></div>
           </div>
     <div class="card">
+            <h2>📒 信号账本 <span class="tag">照做会怎样</span></h2>
+            <div id="ledgerPanel"><div class="loading"><span class="spinner"></span>统计中…</div></div>
+          </div>
+        <div class="card">
             <h2>🛡️ 盈利保护 <span class="tag">浮盈 10% 起监控</span></h2>
             <div id="profitGuardPanel"><div class="loading"><span class="spinner"></span>扫描中…</div></div>
           </div>
@@ -787,6 +791,33 @@ async function loadDailyReview() {
       ${histHtml}`;
   } catch (e) {
     el.style.display = 'none';
+  }
+}
+
+/* ── 信号账本 ── */
+async function loadLedger() {
+  const el = document.getElementById('ledgerPanel');
+  if (!el) return;
+  try {
+    const r = await api('/api/signal-ledger?days=30');
+    if (!r.count) { el.innerHTML = '<div class="dim" style="font-size:11.5px;">还没有可验证的信号</div>'; return; }
+    const good = r.avg_diff > 0;
+    const rows = (r.items || []).slice(0, 8).map(x => `
+      <div style="display:flex;justify-content:space-between;font-size:11.5px;padding:2px 0;border-bottom:1px dashed #1c2739;">
+        <span>${esc(x.name)} <span class="dim" style="font-size:10px;">${esc(x.date.slice(5))}</span></span>
+        <span style="color:${x.diff_pct > 0 ? 'var(--green)' : 'var(--red)'};font-weight:700;">
+          ${x.diff_pct > 0 ? '卖对' : '卖飞'} ${Math.abs(x.diff_pct).toFixed(1)}%</span>
+      </div>`).join('');
+    el.innerHTML = `
+      <div style="font-size:20px;font-weight:800;color:${good ? 'var(--green)' : 'var(--red)'};">
+        ${r.avg_diff > 0 ? '+' : ''}${r.avg_diff}%</div>
+      <div class="dim" style="font-size:10.5px;margin-bottom:6px;">
+        ${r.count} 条信号 · 卖对率 ${r.right_rate}% · 照做平均${r.avg_diff > 0 ? '多赚' : '少赚'} ${Math.abs(r.avg_diff)}%</div>
+      ${rows}
+      <div style="font-size:10.5px;margin-top:6px;color:${good ? 'var(--green)' : 'var(--orange)'};line-height:1.5;">
+        ${esc(r.note || '')}</div>`;
+  } catch (e) {
+    el.innerHTML = '<div class="dim">读取失败</div>';
   }
 }
 
@@ -1785,7 +1816,7 @@ function render() {
   renderHeader(); renderHealth(); renderAssets(); renderGate(); renderPositions();
   renderSell(); renderBuy(); renderDeleverage(); renderSwap(); renderSummary();
   renderMarket(); renderMacro(); renderSectors(); renderPools();
-  renderStrategy(); loadTodo(); loadSignals(); loadEquity(); loadPortfolioBt(); loadWatchpool(); loadFactor(); loadRescue(); loadJwatch(); loadFundamental(); loadBuypoint(); loadFinancing(); loadActionCard(); loadProfitGuard(); loadDailyReview();
+  renderStrategy(); loadTodo(); loadSignals(); loadEquity(); loadPortfolioBt(); loadWatchpool(); loadFactor(); loadRescue(); loadJwatch(); loadFundamental(); loadBuypoint(); loadFinancing(); loadActionCard(); loadProfitGuard(); loadLedger(); loadDailyReview();
 }
 
 /* 底部一句话策略：把「模式 + 卖点 + 仓位 + 市场温度」压成一句能直接照做的话 */

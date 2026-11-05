@@ -239,7 +239,12 @@ def run(account: Optional[Account] = None, use_network: bool = True) -> dict:
         trends = fundamental_engine.assess_map(held_codes)
     except Exception:
         trends = {}
-    sell_signals = sell_engine.scan_positions(account, mode, quality, facts, trends)
+    try:
+        _oversold = bool(adapter.get_index_health().get("oversold"))
+    except Exception:
+        _oversold = False
+    sell_signals = sell_engine.scan_positions(account, mode, quality, facts, trends,
+                                              market_oversold=_oversold)
     sell_by_code: dict[str, list] = {}
     for s in sell_signals:
         sell_by_code.setdefault(s.code, []).append(s)

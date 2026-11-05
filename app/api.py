@@ -651,6 +651,14 @@ def daily_review_history(days: int = 30):
     return {"rows": db.list_daily_reviews(max(1, min(days, 365)))}
 
 
+@router.get("/api/signal-ledger")
+def signal_ledger_view(days: int = 30):
+    """信号账本：系统给的建议照做到今天会怎样（不需要你执行）。"""
+    from .engine import signal_ledger
+
+    return signal_ledger.build(days)
+
+
 @router.get("/api/profit-guard")
 def profit_guard_view():
     """盈利保护：浮盈超过 10% 的持仓，盯超买信号锁利润。"""

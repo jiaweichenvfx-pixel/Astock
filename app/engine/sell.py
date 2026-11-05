@@ -286,6 +286,7 @@ def scan_positions(
     facts: Optional[dict[str, dict]] = None,
     trends: Optional[dict[str, dict]] = None,
     earnings_season: Optional[bool] = None,
+    market_oversold: Optional[bool] = None,
 ) -> list[SellSignal]:
     """扫描所有持仓，输出卖出信号清单（已按紧急度降序）。
 
@@ -299,6 +300,12 @@ def scan_positions(
             earnings_season = _ad.in_earnings_season()
         except Exception:
             earnings_season = False
+    if market_oversold is None:
+        try:
+            from ..data import adapter as _ad
+            market_oversold = _ad.get_index_health().get("oversold", False)
+        except Exception:
+            market_oversold = False
     severity_cfg = config.get_exit_rules()["severity"]
     signals: list[SellSignal] = []
 
@@ -360,6 +367,16 @@ def scan_positions(
                 c.execution = "limit_order"
             surge_note = f"（今日已涨 {gain:.1f}%，不市价卖，挂限价等买盘）"
 
+        # 大盘超卖：技术类卖点全部静默（两周实测：26 条信号只有 38% 卖对，
+        # 10-28 底部那天 8 条信号全错——大盘超卖时技术卖点基本是噪音）
+        oversold_note = ""
+        if market_oversold:
+            candidates = [c for c in candidates
+                          if c.mechanism in (SellMechanism.FUNDAMENTAL, SellMechanism.HARD_STOP)]
+            if not candidates:
+                continue
+            oversold_note = "（大盘超卖，技术卖点已静默，只保留基本面/硬止损）"
+
         # 财报季：技术类卖点降权，避免被财报跳空制造的假跌破骗出场
         season_note = ""
         if earnings_season and primary.mechanism == SellMechanism.TECHNICAL:
@@ -406,7 +423,7 @@ def scan_positions(
                 mechanism=primary.mechanism,
                 severity_score=score,
                 level=level,
-                reason="；".join(reason_parts) + season_note + surge_note,
+                reason="；".join(reason_parts) + season_note + surge_note + oversold_note,
                 suggested_price=suggested,
                 execution=primary.execution,
                 flight_defense=flight,
