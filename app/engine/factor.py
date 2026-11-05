@@ -240,7 +240,8 @@ SYSTEMS = {
         "strategies": {
             "hot_money": (_s_hot_money, "强势(涨+量+连涨)"),
             "vol_breakout": (_s_vol_breakout, "放量突破"),
-            "reversal5": (_s_reversal5, "超跌反抽"),
+            # reversal5（超跌反抽）已停用：长期回测最差（-1.29%，胜率 34%），
+            # 近三周 5 个再平衡窗口里 4 次跑输，超额 -2.98pp。买跌不买涨在 A 股是负期望。
             "mom3": (_s_mom3, "3日动量"),
             "limit_up": (_s_limit_up, "涨停动能"),
         },
