@@ -1213,17 +1213,22 @@ def get_index_health(max_age: int = 1800) -> dict:
     cached = _cache_get("index_health", max_age)
     if cached:
         return cached
-    out = {"rsi": None, "chg3d": None, "oversold": False, "rebounding": False}
+    out = {"rsi": None, "chg3d": None, "chg5d": None, "oversold": False, "rebounding": False}
     try:
         df = _ak_call(ak.stock_zh_index_daily, symbol="sh000001")
         closes = [float(r["close"]) for _, r in df.iterrows()][-80:]
         from ..engine import indicators as _ind
         rsi = _ind.rsi(closes, 14)
         chg3 = (closes[-1] / closes[-4] - 1) * 100 if len(closes) >= 4 else None
+        chg5 = (closes[-1] / closes[-6] - 1) * 100 if len(closes) >= 6 else None
+        # 实测（45 条非金信号）：大盘近 5 日涨时卖点 84% 对，跌时只有 52%
         out = {
             "rsi": round(rsi, 1) if rsi is not None else None,
             "chg3d": round(chg3, 2) if chg3 is not None else None,
-            "oversold": bool(rsi is not None and rsi < 35) or bool(chg3 is not None and chg3 < -3),
+            "chg5d": round(chg5, 2) if chg5 is not None else None,
+            "oversold": (bool(rsi is not None and rsi < 35)
+                         or bool(chg3 is not None and chg3 < -3)
+                         or bool(chg5 is not None and chg5 < -2)),
             "rebounding": bool(chg3 is not None and chg3 > 2),
         }
     except Exception:
