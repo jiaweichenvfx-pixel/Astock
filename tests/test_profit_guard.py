@@ -62,8 +62,9 @@ def test_gold_context(monkeypatch):
         "sge_chg5": -5.85, "sge_dd_from_high": -6.18,
         "verdict": "隔夜 COMEX 跌 -0.51%，黄金股今日大概率承压"})
     monkeypatch.setattr(profit_guard.adapter, "get_stock_history",
-                        lambda code, days=0: [{"date": f"2026-10-{i:02d}", "close": 10 + i * 0.1,
-                                               "high": 11 + i * 0.1, "low": 10, "volume": 1} for i in range(1, 29)])
+                        lambda code, days=0: [{"date": f"2026-{1 + i // 28:02d}-{1 + i % 28:02d}",
+                                               "close": 10 + i * 0.1, "high": 11 + i * 0.1,
+                                               "low": 10, "volume": 1} for i in range(1, 60)])
 
     acc = Account(positions=[Position(code="600489", name="中金黄金", shares=100,
                                       cost_price=14.0, current_price=19.0)],
