@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from typing import Optional
 
+from .. import config
 from ..data import adapter, db
 
 
@@ -31,7 +32,14 @@ def build(days: int = 30) -> dict:
             continue
         seen.add(key)
         if code not in quote_cache:
-            quote_cache[code] = (adapter.get_quotes([code]).get(code) or {}).get("price")
+            px_now = (adapter.get_quotes([code]).get(code) or {}).get("price")
+            # 港股报价是港币，信号价是折算过的人民币，统一到人民币再比
+            if px_now and adapter.is_hk_code(code):
+                try:
+                    px_now = px_now * float(config.get_fx().get("hkd_cny", 0.8508))
+                except Exception:
+                    pass
+            quote_cache[code] = px_now
         now = quote_cache[code]
         if not now or not px:
             continue
