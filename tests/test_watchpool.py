@@ -150,3 +150,23 @@ def test_long_screener_evicts_small_caps(monkeypatch):
     watchpool.daily_update(_screener(), today="2026-10-25",
                            regime={"regime": "up", "label": "上涨市"})
     assert not any(m["code"] == "002724" for m in db.list_pool_members("long", "active"))
+
+
+# ── 硬止损：亏到阈值直接剔除，不等跌破均线 ──────────────────────
+def test_hard_stop_exits_before_ma_break(monkeypatch):
+    # 一路下跌但仍在均线附近的走势：用「反弹后微跌」构造不触发 MA 的情形
+    seq = [10.0] * 30 + [9.4]      # 入场 10.0，现价 9.4 = -6%，跌破 -5% 阈值
+    monkeypatch.setattr(watchpool.adapter, "get_stock_history",
+                        lambda code, days=0, period="daily": _bars(seq))
+    res = watchpool._review("short", "600001", entry_price=10.0)
+    assert res is not None
+    assert "止损" in res[1]
+
+
+def test_no_hard_stop_for_long_pool(monkeypatch):
+    seq = [10.0] * 30 + [9.0]
+    monkeypatch.setattr(watchpool.adapter, "get_stock_history",
+                        lambda code, days=0, period="daily": _bars(seq))
+    # 长线没有硬止损；但跌破 MA250 之类不适用（数据太短），这里只验证不报"止损"
+    res = watchpool._review("long", "600001", entry_price=10.0)
+    assert res is None or "止损" not in res[1]

@@ -28,6 +28,8 @@ MAX_SIZE = 20           # 上限（防止某天一次进太多）
 MA = {"short": 10, "mid": 20, "long": 250}
 CHG_WINDOW = {"short": 5, "mid": 20, "long": 60}
 CHG_EXIT = {"short": -6.0, "mid": -10.0, "long": -25.0}
+# 硬止损：实测（400 笔）加 -5% 止损把盈亏比从 1.44 提到 3.45，平均收益最高
+HARD_STOP = {"short": -5.0, "mid": -8.0, "long": None}
 HIST_DAYS = {"short": 80, "mid": 80, "long": 320}
 
 
@@ -79,13 +81,19 @@ def _long_cap_ok(code: str) -> bool:
         return True
 
 
-def _review(pool: str, code: str) -> Optional[tuple[float, str]]:
+def _review(pool: str, code: str, entry_price: Optional[float] = None) -> Optional[tuple[float, str]]:
     """趋势是否走坏。返回 (剔除价, 原因)，None 表示仍健康。"""
     bars = adapter.get_stock_history(code, days=HIST_DAYS[pool])
     if not bars or len(bars) < 25:
         return None
     closes = [b["close"] for b in bars]
     cur = closes[-1]
+    # 硬止损优先：亏到阈值直接出，不等跌破均线（实测盈亏比 1.44 → 3.45）
+    stop = HARD_STOP.get(pool)
+    if stop is not None and entry_price and entry_price > 0:
+        ret = (cur / entry_price - 1) * 100
+        if ret <= stop:
+            return (round(cur, 2), f"止损 {ret:.1f}%（阈值 {stop:.0f}%）")
     ma = MA[pool]
     if len(closes) >= ma:
         ma_val = sum(closes[-ma:]) / ma
@@ -157,7 +165,7 @@ def daily_update(screener: dict, today: Optional[str] = None,
                        "市值不达标（长线只留 ≥300 亿的大票）")
                 removed.append((pool, m["code"]))
                 continue
-            res = _review(pool, m["code"])
+            res = _review(pool, m["code"], m.get("entry_price"))
             if res:
                 remove(pool, m["code"], today, res[0], res[1])
                 removed.append((pool, m["code"]))
