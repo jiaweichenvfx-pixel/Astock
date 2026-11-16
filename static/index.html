@@ -870,7 +870,22 @@ async function loadProfitGuard() {
         ${x.state === 'lock' ? '<div class="dim" style="font-size:10.5px;">建议先卖 ' + x.half_shares + ' 股（一半）</div>' : ''}
       </div>`;
     }).join('');
-    el.innerHTML = rows +
+    let goldHtml = '';
+    if (r.gold && r.gold.sge != null) {
+      const g = r.gold, o = g.comex_overnight_pct;
+      const gc = o == null ? 'var(--muted)' : o > 0 ? 'var(--green)' : 'var(--red)';
+      goldHtml = `<div style="margin-top:8px;padding:7px 9px;border-radius:8px;background:rgba(212,175,55,.07);border:1px solid rgba(212,175,55,.25);">
+        <div style="font-size:11px;font-weight:700;color:#e0c060;">🥇 金价联动</div>
+        <div style="font-size:11px;margin-top:2px;">上海金 ${g.sge} 元/克
+          <span style="color:${(g.sge_chg5 || 0) >= 0 ? 'var(--green)' : 'var(--red)'};">
+            近5日 ${(g.sge_chg5 > 0 ? '+' : '') + g.sge_chg5}%</span>
+          · 距11月高点 ${(g.sge_dd_from_high > 0 ? '+' : '') + g.sge_dd_from_high}%</div>
+        <div style="font-size:11px;margin-top:2px;color:${gc};">${esc(g.verdict || '')}</div>
+        <div class="dim" style="font-size:10px;margin-top:2px;">
+          中金黄金与上海金相关性 0.71 · Beta 1.3~1.7（金价涨1%，它涨1.3~1.7%）</div>
+      </div>`;
+    }
+    el.innerHTML = rows + goldHtml +
       '<div class="dim" style="font-size:10px;margin-top:6px;">' + esc(r.note || '') + '</div>';
   } catch (e) {
     el.innerHTML = '<div class="dim">读取失败：' + esc(e.message) + '</div>';

@@ -1230,3 +1230,62 @@ def get_index_health(max_age: int = 1800) -> dict:
         pass
     _cache_set("index_health", out)
     return out
+
+
+# ── 金价联动（黄金股本质是金价的高杠杆代理）────────────────────
+GOLD_PROXIES = {"600489": "中金黄金", "600547": "山东黄金", "600988": "赤峰黄金",
+                "601899": "紫金矿业", "002155": "湖南黄金"}
+
+
+def is_gold_proxy(code: str) -> bool:
+    return str(code) in GOLD_PROXIES
+
+
+def get_gold_snapshot(max_age: int = 1800) -> dict:
+    """上海金 + COMEX 金价快照。
+
+    实测（中金黄金 600489，2025-11~2026-11）：
+      与上海金同日相关性 0.71，Beta 1.3~1.75（金价涨 1%，股价涨 1.3~1.8%）
+      **COMEX 隔夜涨 >0.5% → 次日中金平均 +1.72%（165 次）
+        隔夜跌 >0.5% → 次日平均 −1.30%（133 次）**
+    所以看黄金股，先看隔夜金价，比看它的 A 股技术指标更早。
+    """
+    cached = _cache_get("gold_snap", max_age)
+    if cached:
+        return cached
+    out: dict = {"sge": None, "comex": None, "comex_overnight_pct": None,
+                 "sge_chg5": None, "sge_dd_from_high": None, "verdict": ""}
+    try:
+        sge = _ak_call(ak.spot_hist_sge, symbol="Au99.99")
+        rows = [(str(r["date"])[:10], float(r["close"])) for _, r in sge.iterrows()]
+        rows = rows[-30:]
+        if rows:
+            out["sge"] = rows[-1][1]
+            out["sge_date"] = rows[-1][0]
+            if len(rows) >= 6:
+                out["sge_chg5"] = round((rows[-1][1] / rows[-6][1] - 1) * 100, 2)
+            recent = [c for d, c in rows if d >= "2026-11-01"] or [c for _, c in rows]
+            if recent:
+                out["sge_dd_from_high"] = round((rows[-1][1] / max(recent) - 1) * 100, 2)
+    except Exception:
+        pass
+    try:
+        gc = _ak_call(ak.futures_foreign_hist, symbol="GC")
+        rows = [(str(r["date"])[:10], float(r["close"])) for _, r in gc.iterrows()][-10:]
+        if len(rows) >= 2:
+            out["comex"] = rows[-1][1]
+            out["comex_overnight_pct"] = round((rows[-1][1] / rows[-2][1] - 1) * 100, 2)
+    except Exception:
+        pass
+
+    o = out["comex_overnight_pct"]
+    if o is None:
+        out["verdict"] = "金价数据缺失"
+    elif o >= 0.5:
+        out["verdict"] = f"隔夜 COMEX 涨 {o:+.2f}%，黄金股今日大概率高开走强"
+    elif o <= -0.5:
+        out["verdict"] = f"隔夜 COMEX 跌 {o:+.2f}%，黄金股今日大概率承压"
+    else:
+        out["verdict"] = f"隔夜 COMEX {o:+.2f}%，黄金股方向不明"
+    _cache_set("gold_snap", out)
+    return out

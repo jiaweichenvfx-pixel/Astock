@@ -43,6 +43,12 @@ def _state(pnl: float, rsi: Optional[float], j: Optional[float],
 def scan(account, watch_pnl: float = WATCH_PNL) -> dict:
     """扫描浮盈超过 watch_pnl 的持仓，给出锁利润状态。"""
     rows = []
+    gold = None
+    try:
+        if any(adapter.is_gold_proxy(p.code) for p in account.positions):
+            gold = adapter.get_gold_snapshot()
+    except Exception:
+        gold = None
     for p in account.positions:
         pnl = p.pnl_ratio or 0
         if pnl < watch_pnl:
@@ -65,11 +71,13 @@ def scan(account, watch_pnl: float = WATCH_PNL) -> dict:
             "divergence": bool(t.get("macd_divergence")),
             "dd_60d": t.get("dd_60d"),
             "state": state, "why": why,
+            "is_gold": adapter.is_gold_proxy(p.code),
             "half_shares": max(100, (p.shares // 200) * 100) if p.shares >= 200 else p.shares,
         })
     order = {"lock": 0, "weak": 1, "near": 2, "ok": 3}
     rows.sort(key=lambda r: (order.get(r["state"], 9), -r["pnl_ratio"]))
     return {
+        "gold": gold,
         "rows": rows,
         "lock_count": sum(1 for r in rows if r["state"] == "lock"),
         "weak_count": sum(1 for r in rows if r["state"] == "weak"),

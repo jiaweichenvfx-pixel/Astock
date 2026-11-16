@@ -49,3 +49,25 @@ def test_drawdown_stop_skipped_when_oversold(monkeypatch):
                    current_price=20.36, rating=None)
     assert sell.check_drawdown_stop(pos, -32.0, rsi=27) is None      # 超卖：不喊崩塌
     assert sell.check_drawdown_stop(pos, -32.0, rsi=55) is not None  # 正常：该喊
+
+
+# 黄金股附带金价上下文
+def test_gold_context(monkeypatch):
+    from app.engine import profit_guard
+    from app.schemas import Account, Position
+
+    monkeypatch.setattr(profit_guard.adapter, "is_gold_proxy", lambda c: str(c) == "600489")
+    monkeypatch.setattr(profit_guard.adapter, "get_gold_snapshot", lambda: {
+        "sge": 829.49, "comex": 3867.8, "comex_overnight_pct": -0.51,
+        "sge_chg5": -5.85, "sge_dd_from_high": -6.18,
+        "verdict": "隔夜 COMEX 跌 -0.51%，黄金股今日大概率承压"})
+    monkeypatch.setattr(profit_guard.adapter, "get_stock_history",
+                        lambda code, days=0: [{"date": f"2026-10-{i:02d}", "close": 10 + i * 0.1,
+                                               "high": 11 + i * 0.1, "low": 10, "volume": 1} for i in range(1, 29)])
+
+    acc = Account(positions=[Position(code="600489", name="中金黄金", shares=100,
+                                      cost_price=14.0, current_price=19.0)],
+                  cash=0.0, financing_balance=0.0)
+    r = profit_guard.scan(acc)
+    assert r["gold"] and r["gold"]["sge"] == 829.49
+    assert r["rows"][0]["is_gold"] is True
