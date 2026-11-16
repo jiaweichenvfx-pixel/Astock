@@ -920,6 +920,23 @@ async function loadActionCard() {
       <div class="verdict">${esc(r.verdict)}</div>
       <div class="ctx">${esc(r.context || '')}</div>
       ${rows}${nobuy}${buys}${eff}
+      ${(() => {
+        const t = r.tranche;
+        if (!t || !t.plans || !t.plans.length) return '';
+        const c = t.level === 'high' ? 'var(--green)' : t.level === 'low' ? 'var(--orange)' : 'var(--muted)';
+        const p25 = t.plans[0];
+        return `<div style="margin-top:8px;padding:8px 10px;border-radius:9px;
+            background:rgba(255,255,255,.03);border:1px dashed var(--border);">
+          <div style="font-size:11.5px;font-weight:700;">分批减仓档位
+            <span style="color:${c};font-weight:400;">· 净值在近20日的 ${t.percentile}% 位置（${t.level === 'high' ? '相对高位' : t.level === 'low' ? '相对低位' : '中位'}）</span></div>
+          <div class="dim" style="font-size:10.5px;margin-top:2px;">${esc(t.advice)}</div>
+          <div style="font-size:11px;margin-top:4px;">
+            第一档 减 25% ≈ ${(p25.amount / 1e4).toFixed(1)} 万
+            → 月息 ${p25.monthly_after.toFixed(0)}，年省 ${(p25.annual_saving / 1e4).toFixed(1)} 万
+            <span class="dim">（优先：${p25.picks.slice(0, 3).map(x => esc(x.name)).join('、')}）</span>
+          </div>
+        </div>`;
+      })()}
       <div class="dim" style="font-size:10.5px;margin-top:8px;">${esc(r.note || '')}</div>`;
   } catch (e) {
     el.style.display = 'none';

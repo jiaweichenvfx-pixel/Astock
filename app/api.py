@@ -714,7 +714,13 @@ def action_view():
         bp = buypoint.scan([p.code for p in acc.positions])
     except Exception:
         bp = None
-    return action_card.build(s, t, fin, bp)
+    result = action_card.build(s, t, fin, bp)
+    try:
+        from .engine import tranche_planner
+        result["tranche"] = tranche_planner.evaluate(acc, None)
+    except Exception:
+        pass
+    return result
 
 
 @router.get("/api/todo")
